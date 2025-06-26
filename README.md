@@ -22,7 +22,7 @@ The plugin is not available in [the official Community Plugins repository](https
 2. Input the plugin code 2055492159 for [AnkiConnect](https://ankiweb.net/shared/info/2055492159) and press OK
 3. Restart Anki and return to the Add-ons menu; there should be a configuration menu under **Config**.
 Make sure Obsidian is added as a known origin to the plugin:
-<pre>
+```json
 {
     "apiKey": null,
     "apiLogPath": null,
@@ -31,10 +31,10 @@ Make sure Obsidian is added as a known origin to the plugin:
     "webCorsOrigin": "http://localhost",
     "webCorsOriginList": [
         "http://localhost",
-        <strong>"app://obsidian.md"</strong>
+        "app://obsidian.md"
     ]
 }
-</pre>
+```
 
 ## Getting started
 Detailed examples of how to use the plugin are given in the plugin's [wiki page](https://github.com/eevdriet/obsidi-anki/wiki)
