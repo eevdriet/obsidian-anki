@@ -20,13 +20,10 @@ export type ExportRule = {
 
         // Mapping of which field corresponds to which capture group
         captures: Record<number, string>;
-
-        // Which deck to export the notes into
-        deck: string;
-
-        // Which cards to create for the note
-        cards: string[];
     };
+
+    // Which deck to export the notes into
+    deck: string;
 
     source: {
         // Path of the folder to search in for export notes
@@ -59,11 +56,12 @@ export const DEFAULT_EXPORT_RULE: ExportRule = Object.freeze({
     },
 
     regex: {
-        format: '([\\w\\s]+) -> ([\\w\\s]+) #flashcard/basic',
+        format: '^([\\w\\s]+) -> ([\\w\\s]+) #flashcard/basic$',
         captures: {},
-        deck: 'Deck',
         cards: [],
     },
+
+    deck: 'Default',
 
     source: {
         folder: '/',

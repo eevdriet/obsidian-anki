@@ -8,7 +8,6 @@ import {
     TextComponent,
 } from 'obsidian';
 import AnkiPlugin from 'plugin';
-import { getRegex101URL } from 'regex';
 import { DEFAULT_EXPORT_RULE, ExportType, ExportRule } from 'settings/export';
 import { addSection } from 'modals';
 import { FolderSuggest, TextSuggest } from './suggest';
@@ -57,6 +56,7 @@ export default class ExportModal extends AnkiModal {
 
         this.displayName(contentEl);
         this.displayNoteType(contentEl);
+        this.displayDecks(contentEl);
         this.addExportFormat(contentEl);
         this.displayFields(contentEl);
         this.displayFiles(contentEl);
@@ -196,6 +196,25 @@ export default class ExportModal extends AnkiModal {
         });
 
         validate();
+    }
+
+    private displayDecks(contentEl: HTMLElement) {
+        const decks = this.plugin.decks ?? [];
+
+        new Setting(contentEl)
+            .setName('Deck')
+            .setDesc(
+                'Deck to export notes to when no deck is specified for the exporter rule'
+            )
+            .addText((text) => {
+                new TextSuggest(this.app, text.inputEl, decks);
+                text.setPlaceholder(DEFAULT_EXPORT_RULE.deck)
+                    .setValue(this.rule.deck)
+                    .onChange((value) => {
+                        this.rule.deck = value;
+                        this.plugin.save();
+                    });
+            });
     }
 
     private addExportFormat(contentEl: HTMLElement) {
@@ -352,23 +371,6 @@ export default class ExportModal extends AnkiModal {
         const regexWarningEl = contentEl.createDiv({
             cls: 'error',
         });
-
-        const decks = this.plugin.decks ?? [];
-
-        new Setting(contentEl)
-            .setName('Deck')
-            .setDesc(
-                'Deck to export notes to when no deck is specified for the exporter rule'
-            )
-            .addText((text) => {
-                new TextSuggest(this.app, text.inputEl, decks);
-                text.setPlaceholder(DEFAULT_EXPORT_RULE.regex.deck)
-                    .setValue(this.rule.regex.deck)
-                    .onChange((value) => {
-                        this.rule.regex.deck = value;
-                        this.plugin.save();
-                    });
-            });
 
         new Setting(contentEl)
             .setName('Captures')

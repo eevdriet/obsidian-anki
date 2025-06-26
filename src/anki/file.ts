@@ -176,9 +176,7 @@ export class File {
 
             note.fields = match.fields;
             note.deck =
-                match.deck ??
-                this.findMatch(pos, this.decks) ??
-                rule.regex.deck;
+                match.deck ?? this.findMatch(pos, this.decks) ?? rule.deck;
 
             note.tags = (match.tags ?? this.findMatch(pos, this.tags) ?? '')
                 .split(LIST_SEP_REGEX)
