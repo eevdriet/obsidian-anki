@@ -1,0 +1,75 @@
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
+.anki-settings-table td,
+.anki-settings-table th {
+    border: 1px solid var(--background-modifier-border);
+    padding: 4px 10px;
+}
+
+/* .anki-settings-table { */
+/* 	border-collapse: collapse; */
+/* 	display: none; */
+/* } */
+
+input.error,
+textarea.error,
+select.error {
+    border: 1px solid var(--text-error) !important;
+}
+
+input.warning,
+textarea.warning,
+select.warning {
+    border: 1px solid var(--text-warning) !important;
+}
+
+div.error,
+input.error,
+textarea.error {
+    color: var(--text-error) !important;
+}
+
+div.warning,
+input.warning,
+textarea.warning {
+    color: var(--text-warning) !important;
+}
+
+.enabled-button {
+    color: var(--interactive-accent) !important;
+}
+.enabled-rule {
+    color: gray;
+}
+
+.setting-item.setting-item-heading:has(.latex-suite-settings-icon)
+    ~ .setting-item:not(.setting-item-heading),
+.setting-item-nested-heading,
+.text-area-error,
+.text-area-warning + .setting-item-control {
+    width: calc(100% - 26px);
+    margin-left: 26px;
+}
+
+.text-area-warning,
+.text-area-error {
+    padding: 4px 8px;
+}
+
+a.external-url {
+    width: 100%;
+    height: 100%;
+    color: var(--text-color);
+    text-decoration: none;
+    text-align: center !important;
+}
+
+.setting-item > *:first-child {
+    margin-inline-end: var(--size-4-4);
+}

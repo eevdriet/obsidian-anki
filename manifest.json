@@ -1,0 +1,11 @@
+{
+  "id": "obsidi-anki",
+  "name": "ObsidiAnki",
+  "version": "0.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Bridges the gap between defining flashcards in Obsidian and working with them in Anki.",
+  "author": "eevdriet",
+  "authorUrl": "https://github.com/eevdriet/",
+  "fundingUrl": "https://obsidian.md/pricing",
+  "isDesktopOnly": true
+}
