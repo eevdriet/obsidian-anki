@@ -7,6 +7,8 @@ export type ImportRule = {
     // Whether the rule currently is enabled
     enabled: boolean;
 
+    noteType: string;
+
     // Query to subset all notes for the given note type
     query: string;
 

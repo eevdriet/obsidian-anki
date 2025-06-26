@@ -59,20 +59,17 @@ export default class Importer extends NoteScanner {
         );
 
         // Create the requests to get the notes from Anki
-        const responses = rules.map(async (rule) =>
-            AnkiConnect.getNotes(rule.query)
-        );
-        console.info('Responses', responses);
+        const responses = rules.map(async (rule) => {
+            const typeArg = `note:"${rule.noteType}"`;
 
-        // // Construct the query to import the notes
-        // let userQuery = `(${rule.query})`;
-        // const typeArg = `note:"${rule.noteType}"`;
-        // if (!userQuery.includes(typeArg)) {
-        //     userQuery =
-        //         userQuery === '' ? typeArg : `${typeArg} AND ${userQuery}`;
-        // }
-        //
-        // debug('Query', userQuery);
+            let query = rule.query;
+            if (!query.includes(typeArg)) {
+                query = `(${query}) AND ${typeArg}`;
+            }
+
+            return AnkiConnect.getNotes(query);
+        });
+        console.info('Responses', responses);
 
         // Parse the responses for each rules
         const allAnkiNotes = await Promise.all(responses);
