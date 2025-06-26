@@ -231,7 +231,7 @@ export default class ExportModal extends AnkiModal {
         const formatSection = addSection(
             parentEl,
             'Format',
-            'Whether to import all notes into a folder or a single file',
+            'Set the format of the note as a template or regular expression',
             'pencil'
         );
 
