@@ -1,7 +1,7 @@
 import { TEMPLATE_FIELDS } from 'common';
 import { Modal, setIcon, Setting } from 'obsidian';
 import AnkiPlugin from 'plugin';
-import { ANKI_FIELD_REGEX } from 'regex';
+import { ANKI_PATTERN_REGEX } from 'regex';
 
 export default abstract class AnkiModal extends Modal {
     plugin: AnkiPlugin;
@@ -61,11 +61,11 @@ export function addSection(
 }
 
 export function validateTemplate(
-    value: string,
+    template: string,
     noteFields: string[],
     includeTemplateFields: boolean = false
 ): [boolean, string] {
-    const fields = [...value.matchAll(ANKI_FIELD_REGEX)];
+    const fields = [...template.matchAll(ANKI_PATTERN_REGEX)];
     const names = fields.map((field) => field[1]);
 
     if (fields.length === 0) {
@@ -87,6 +87,25 @@ export function validateTemplate(
         if (includeTemplateFields) {
             message = `Template should have {{Fields}} or at least one {{Field}} replacement:\n${fieldsStr}`;
         }
+        return [false, message];
+    }
+
+    // No two patterns only separated by whitespace on the same line
+    const twoPatternRegex = new RegExp(
+        `${ANKI_PATTERN_REGEX.source}[ \\t]*${ANKI_PATTERN_REGEX.source}`,
+        'm'
+    );
+    if ((template.match(twoPatternRegex) ?? []).length > 0) {
+        const message =
+            'Template cannot have two {{...}} patterns only separated by whitespace';
+        return [false, message];
+    }
+
+    // At least some non-whitespace literal text
+    const noPatternTemplate = template.replace(ANKI_PATTERN_REGEX, '');
+    if (!/\S/.test(noPatternTemplate)) {
+        const message =
+            'Template must contain some non-whitespace literal text';
         return [false, message];
     }
 

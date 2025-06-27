@@ -2,7 +2,7 @@ import { CachedMetadata, TFile } from 'obsidian';
 import { Note, NoteStatus } from './note';
 import AnkiPlugin from 'plugin';
 import {
-    ANKI_FIELD_REGEX as ANKI_PATTERN_REGEX,
+    ANKI_PATTERN_REGEX,
     createFieldRegex,
     createFieldsRegex,
     LIST_SEP_REGEX,
@@ -276,44 +276,52 @@ export class File {
             'gm'
         );
 
-        const result = this.matchAll(regex).map((match) => {
-            const groups = match.slice(1, -patterns.length);
+        const allFields = this.plugin.fields[rule.noteType] ?? [];
 
-            // Construct fields
-            const fields: Record<string, string> = {};
-            const allFields = this.plugin.fields[rule.noteType] ?? [];
+        const result = this.matchAll(regex)
+            // Only keep notes that have at least a single capture group set
+            .filter((match) => {
+                const groups = match.slice(1, -patterns.length);
 
-            for (let idx = 0; idx < allFields.length; idx++) {
-                // Read the fields in order or from manually set captures
-                let field = allFields[idx];
-                if (idx in rule.regex.captures) {
-                    field = rule.regex.captures[idx];
+                return groups.some((group) => group !== undefined);
+            })
+            .map((match) => {
+                const groups = match.slice(1, -patterns.length);
+
+                // Construct fields
+                const fields: Record<string, string> = {};
+
+                for (let idx = 0; idx < allFields.length; idx++) {
+                    // Read the fields in order or from manually set captures
+                    let field = allFields[idx];
+                    if (idx in rule.regex.captures) {
+                        field = rule.regex.captures[idx];
+                    }
+
+                    let group = groups.at(idx);
+
+                    // Override field if the capture is empty
+                    if (rule.shouldOverride && group === undefined) {
+                        group = '';
+                    }
+
+                    // Set the field to its captured value if anything was captured (or overridden)
+                    if (group !== undefined) {
+                        fields[field] = group;
+                    }
                 }
 
-                let group = groups.at(idx);
+                const { id, deck, cards, tags } = match.groups!;
 
-                // Override field if the capture is empty
-                if (rule.shouldOverride && group === undefined) {
-                    group = '';
-                }
-
-                // Set the field to its captured value if anything was captured (or overridden)
-                if (group !== undefined) {
-                    fields[field] = group;
-                }
-            }
-
-            const { id, deck, cards, tags } = match.groups!;
-
-            return {
-                result: match,
-                fields,
-                deck,
-                id,
-                cards,
-                tags,
-            };
-        });
+                return {
+                    result: match,
+                    fields,
+                    deck,
+                    id,
+                    cards,
+                    tags,
+                };
+            });
 
         return result;
     }

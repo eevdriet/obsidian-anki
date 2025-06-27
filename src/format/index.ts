@@ -1,6 +1,6 @@
 import { Note } from 'anki/note';
 import { TEMPLATE_FIELDS } from 'common';
-import { ANKI_CLOZE_REGEX, ANKI_FIELD_REGEX } from 'regex';
+import { ANKI_CLOZE_REGEX, ANKI_PATTERN_REGEX } from 'regex';
 
 export interface FileEscapeOptions {
     // Replaces {{cn::<cloze>}} with just <cloze>
@@ -106,7 +106,7 @@ export function escapeField(field: string): string {
 }
 
 export function formatTemplate(template: string, note: Note): string {
-    return template.replace(ANKI_FIELD_REGEX, (field, key) => {
+    return template.replace(ANKI_PATTERN_REGEX, (field, key) => {
         // Do not replace any non-fields or special patterns
         if (!(TEMPLATE_FIELDS.includes(key) || key in note.fields)) {
             return field;

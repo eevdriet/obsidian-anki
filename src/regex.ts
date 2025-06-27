@@ -1,4 +1,3 @@
-import { debug } from 'console';
 import { escapeField, escapeRegex } from 'format';
 
 // Utils
@@ -27,7 +26,7 @@ export const ANKI_MATH_BLOCK_REGEX = /(\\\[[\s\S]*?\\\])|(\\\([\s\S]*?\\\))/g;
 export const ANKI_CODE_INLINE_REGEX = /(?<!`)`(?=[^`])[\s\S]*?`/g;
 export const ANKI_CODE_BLOCK_REGEX = /```[\s\S]*?```/g;
 
-export const ANKI_FIELD_REGEX = /\{\{([^:"{}]*)\}\}/g;
+export const ANKI_PATTERN_REGEX = /\{\{([^:"{}]*)\}\}/g;
 export const ANKI_CLOZE_REGEX =
     /\{\{c(?<cloze_number>\d+)::(?<cloze_value>.+?)\}\}/gm;
 

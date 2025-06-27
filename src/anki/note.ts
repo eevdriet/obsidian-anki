@@ -1,8 +1,6 @@
 import AnkiPlugin from 'plugin';
 import {
-    ANKI_FIELD_REGEX,
-    CARDS_PATTERN,
-    createFieldsRegex,
+    ANKI_PATTERN_REGEX,
     DECK_PATTERN,
     FIELDS_PATTERN,
     NOTE_ID_COMMENT_REGEX,
@@ -111,7 +109,7 @@ export class Note {
         this.text = template;
 
         // Replace individual {{Field}} patterns
-        this.text = this.text.replace(ANKI_FIELD_REGEX, (match, key) => {
+        this.text = this.text.replace(ANKI_PATTERN_REGEX, (match, key) => {
             return key in this.fields ? this.fields[key] : match;
         });
 
