@@ -1,9 +1,10 @@
 import { PRIMARY_BUTTON_CLASS } from 'common';
-import AnkiModal, { validateTemplate } from 'modals';
+import AnkiModal, { setupWikiButton, validateTemplate } from 'modals';
 import {
     ButtonComponent,
     DropdownComponent,
     ExtraButtonComponent,
+    setIcon,
     Setting,
     TextAreaComponent,
     TextComponent,
@@ -298,21 +299,25 @@ export default class ExportModal extends AnkiModal {
             return isValid;
         };
 
-        const templateTextEl = new Setting(contentEl).addTextArea((text) => {
-            templateInput = text;
-            text.inputEl.rows = 10;
-            text.inputEl.cols = 220;
+        const templateTextEl = new Setting(contentEl)
+            .setName('Template')
+            .addTextArea((text) => {
+                templateInput = text;
+                text.inputEl.rows = 10;
+                text.inputEl.cols = 220;
+                text.inputEl.style.width = '100%';
+                text.inputEl.style.boxSizing = 'border-box';
 
-            text.setPlaceholder('Template')
-                .setValue(this.rule.template.format)
-                .onChange((value) => {
-                    this.rule.template.format = value;
-                    validate();
-                });
-        });
+                text.setPlaceholder('Template')
+                    .setValue(this.rule.template.format)
+                    .onChange((value) => {
+                        this.rule.template.format = value;
+                        validate();
+                    });
+            });
 
-        templateTextEl.controlEl.style.width = '100%';
-        templateTextEl.settingEl.style.margin = '0px';
+        templateTextEl.settingEl.style.flexDirection = 'column';
+        templateTextEl.settingEl.style.alignItems = 'flex-start';
 
         const templateWarningEl = contentEl.createDiv({
             cls: 'error',
@@ -360,50 +365,53 @@ export default class ExportModal extends AnkiModal {
         };
 
         // Regular expressions
+        const regexTextEl = new Setting(contentEl)
+            .setName('Regular expression')
+            .addTextArea((text) => {
+                regexInput = text;
 
-        const regexTextEl = new Setting(contentEl).addTextArea((text) => {
-            regexInput = text;
+                text.inputEl.rows = 5;
+                text.inputEl.cols = 220;
+                text.inputEl.style.width = '100%';
+                text.inputEl.style.boxSizing = 'border-box';
 
-            text.inputEl.rows = 5;
-            text.inputEl.cols = 220;
+                text.setPlaceholder('Regular expression');
+                text.onChange((value) => {
+                    validate();
 
-            text.setPlaceholder('Regular expression');
-            text.onChange((value) => {
-                validate();
-
-                this.rule.regex.format = value;
-                this.displayFields(contentEl);
+                    this.rule.regex.format = value;
+                    this.displayFields(contentEl);
+                });
+                text.setValue(this.rule.regex.format);
             });
-            text.setValue(this.rule.regex.format);
-        });
 
-        regexTextEl.controlEl.style.width = '100%';
-        regexTextEl.settingEl.style.margin = '0px';
+        regexTextEl.settingEl.style.flexDirection = 'column';
+        regexTextEl.settingEl.style.alignItems = 'flex-start';
 
         const regexWarningEl = contentEl.createDiv({
             cls: 'error',
         });
 
-        addSection(
-            contentEl,
-            'Captures',
-            'Map the fields of the note type to a specific capture group',
-            'regex'
-        ).addExtraButton((button) => {
-            this.capturesButton = button;
+        new Setting(contentEl)
+            .setName('Captures')
+            .setDesc(
+                'Map the fields of the note type to a specific capture group'
+            )
+            .addExtraButton((button) => {
+                this.capturesButton = button;
 
-            button
-                .setIcon('chevron-right')
-                .setTooltip('Add new field capture')
-                .onClick(() => {
-                    // Captures open state should not change on redraw regex setting
-                    if (!this.isFormatSwitch) {
-                        this.capturesOpened = !this.capturesOpened;
-                    }
+                button
+                    .setIcon('chevron-right')
+                    .setTooltip('Add new field capture')
+                    .onClick(() => {
+                        // Captures open state should not change on redraw regex setting
+                        if (!this.isFormatSwitch) {
+                            this.capturesOpened = !this.capturesOpened;
+                        }
 
-                    this.addCaptureGroups(contentEl);
-                });
-        });
+                        this.addCaptureGroups(contentEl);
+                    });
+            });
 
         this.addCaptureGroups(contentEl);
         validate();

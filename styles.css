@@ -48,20 +48,39 @@ textarea.warning {
     color: gray;
 }
 
-.setting-item.setting-item-heading:has(.latex-suite-settings-icon)
+/* Settings menu with indented sections */
+.setting-item.hidden {
+    display: none;
+}
+
+.setting-item.setting-item-heading .obsidi-anki-settings-icon {
+    margin-right: var(--size-4-2);
+    display: inline-flex;
+}
+
+.setting-item.setting-item-heading:has(.obsidi-anki-settings-icon) {
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.setting-item.setting-item-heading:has(.obsidi-anki-settings-icon)
+    + .setting-item {
+    border-top: none;
+}
+
+.setting-item.setting-item-heading:has(.obsidi-anki-settings-icon)
     ~ .setting-item:not(.setting-item-heading),
-.setting-item-nested-heading,
-.text-area-error,
-.text-area-warning + .setting-item-control {
+.obsidi-anki-snippet-variables-setting + .setting-item-control {
     width: calc(100% - 26px);
     margin-left: 26px;
 }
 
+/* Text area errors */
 .text-area-warning,
 .text-area-error {
     padding: 4px 8px;
 }
 
+/* Nicer looking links */
 a.external-url {
     width: 100%;
     height: 100%;
@@ -85,4 +104,8 @@ a.external-url {
     left: 0;
     font-size: 1em;
     color: var(--text-muted); /* optional for subtlety */
+}
+
+.after-section-settings .setting-item {
+    margin-left: 1.5em;
 }

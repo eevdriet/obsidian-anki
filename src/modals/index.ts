@@ -1,5 +1,5 @@
-import { TEMPLATE_FIELDS } from 'common';
-import { Modal, setIcon, Setting } from 'obsidian';
+import { TEMPLATE_FIELDS, WIKI_URL } from 'common';
+import { ExtraButtonComponent, Modal, setIcon, Setting } from 'obsidian';
 import AnkiPlugin from 'plugin';
 import { ANKI_PATTERN_REGEX } from 'regex';
 
@@ -53,11 +53,27 @@ export function addSection(
     // Set icon
     const iconEl = parentEl.createDiv();
     setIcon(iconEl, icon);
-    iconEl.addClass('anki-bridge-settings-icon');
-
+    iconEl.addClass('obsidi-anki-settings-icon');
     parentEl.prepend(iconEl);
 
     return heading;
+}
+
+export function setupWikiButton(button: ExtraButtonComponent, section: string) {
+    button
+        .setIcon('info')
+        .setTooltip('Open documentation')
+        .onClick(() => {
+            const a = new DocumentFragment().createEl('a', {
+                text: `${section} documentation`,
+                href: `${WIKI_URL}/${section}`,
+                attr: { target: '_blank', rel: 'noopener' },
+            });
+            // Dummy click to download
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
 }
 
 export function validateTemplate(

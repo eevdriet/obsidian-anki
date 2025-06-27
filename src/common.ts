@@ -6,7 +6,10 @@ export const ANKI_ICON: string = `<path fill="currentColor" stroke="currentColor
 
 export const PRIMARY_BUTTON_CLASS = 'mod-cta';
 
+// URLs
 export const CODE_CSS_URL = `https://cdn.jsdelivr.net/npm/highlightjs-themes@1.0.0/arta.css`;
+export const REPO_URL = 'https://github.com/eevdriet/obsidian-anki';
+export const WIKI_URL = `${REPO_URL}/wiki`;
 
 export const IMAGE_EXTENSIONS: string[] = [
     '.png',
