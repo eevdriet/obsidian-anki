@@ -45,7 +45,7 @@ textarea.warning {
     color: var(--interactive-accent) !important;
 }
 .enabled-rule {
-    color: gray;
+    color: var(--text-muted);
 }
 
 /* Settings menu with indented sections */
@@ -72,6 +72,11 @@ textarea.warning {
 .obsidi-anki-snippet-variables-setting + .setting-item-control {
     width: calc(100% - 26px);
     margin-left: 26px;
+}
+
+/* Documentation button */
+.obsidi-anki-docs-icon {
+    color: var(--interactive-accent);
 }
 
 /* Text area errors */

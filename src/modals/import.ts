@@ -1,5 +1,5 @@
 import { PLUGIN, PRIMARY_BUTTON_CLASS } from 'common';
-import AnkiModal, { validateTemplate } from 'modals';
+import AnkiModal, { setupWikiButton, validateTemplate } from 'modals';
 import {
     ButtonComponent,
     DropdownComponent,
@@ -56,7 +56,7 @@ export default class ImportModal extends AnkiModal {
         const { contentEl } = this;
         contentEl.empty();
 
-        this.displayHeader(contentEl);
+        this.displayGeneral(contentEl);
 
         this.displayName(contentEl);
         this.displayNoteType(contentEl);
@@ -69,7 +69,7 @@ export default class ImportModal extends AnkiModal {
         this.displayDestination(contentEl);
     }
 
-    private displayHeader(contentEl: HTMLElement) {
+    private displayGeneral(contentEl: HTMLElement) {
         const action = this.initialName === '?' ? 'Create' : 'Edit';
         contentEl.createEl('h1', { text: `${action} importer` });
 
@@ -84,6 +84,9 @@ export default class ImportModal extends AnkiModal {
                     this.close();
                 });
         });
+        section.addExtraButton((button) =>
+            setupWikiButton(button, 'Importing#general')
+        );
 
         this.validateSaveButton();
     }
@@ -234,8 +237,8 @@ export default class ImportModal extends AnkiModal {
             parentEl,
             'Template',
             'Write the template to import Anki notes',
-            'pencil'
-        );
+            'braces'
+        ).addExtraButton((button) => setupWikiButton(button, 'Templates'));
 
         let templateInput: TextAreaComponent;
 
@@ -307,7 +310,10 @@ export default class ImportModal extends AnkiModal {
                     .onChange((value) => {
                         this.rule.tag.format = value;
                     });
-            });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Importing#tags')
+            );
     }
 
     private displayDuplicate(contentEl: HTMLElement) {
@@ -318,6 +324,7 @@ export default class ImportModal extends AnkiModal {
             '',
             'square-stack'
         );
+
         const desc = new DocumentFragment();
         desc.appendText('How to handle notes that have already been imported');
 
@@ -342,20 +349,23 @@ export default class ImportModal extends AnkiModal {
             ul.appendChild(li);
         }
 
-        section.setDesc(desc);
-
-        section.addDropdown((dropdown) => {
-            dropdown
-                .addOptions({
-                    ignore: 'Ignore',
-                    update: 'Update',
-                    append: 'Append',
-                })
-                .setValue(this.rule.existingAction)
-                .onChange((action: ExistingAction) => {
-                    this.rule.existingAction = action;
-                });
-        });
+        section
+            .setDesc(desc)
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOptions({
+                        ignore: 'Ignore',
+                        update: 'Update',
+                        append: 'Append',
+                    })
+                    .setValue(this.rule.existingAction)
+                    .onChange((action: ExistingAction) => {
+                        this.rule.existingAction = action;
+                    });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Importing#existing-notes')
+            );
     }
 
     private displayDestination(contentEl: HTMLElement) {
@@ -367,15 +377,19 @@ export default class ImportModal extends AnkiModal {
             'folder-output'
         );
 
-        section.addDropdown((dropdown) => {
-            dropdown
-                .addOptions({ folder: 'Folder', file: 'File' })
-                .setValue(this.rule.type)
-                .onChange((type: ImportType) => {
-                    this.rule.type = type;
-                    this.displayDestinationOptions(contentEl);
-                });
-        });
+        section
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOptions({ folder: 'Folder', file: 'File' })
+                    .setValue(this.rule.type)
+                    .onChange((type: ImportType) => {
+                        this.rule.type = type;
+                        this.displayDestinationOptions(contentEl);
+                    });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Importing#destination')
+            );
 
         this.displayDestinationOptions(contentEl);
 

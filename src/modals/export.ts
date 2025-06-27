@@ -58,10 +58,10 @@ export default class ExportModal extends AnkiModal {
         contentEl.empty();
 
         this.displayHeader(contentEl);
-
         this.displayName(contentEl);
         this.displayNoteType(contentEl);
         this.displayDecks(contentEl);
+
         this.addExportFormat(contentEl);
         this.displayFields(contentEl);
         this.displayFiles(contentEl);
@@ -72,18 +72,22 @@ export default class ExportModal extends AnkiModal {
         contentEl.createEl('h1', { text: `${action} exporter` });
 
         const section = addSection(contentEl, 'General', '', 'cog');
-        section.addButton((button) => {
-            this.saveButton = button;
-            button
-                .setButtonText('Save')
-                .setClass(PRIMARY_BUTTON_CLASS)
-                .onClick(async () => {
-                    await this.onSave();
-                    this.close();
-                });
+        section
+            .addButton((button) => {
+                this.saveButton = button;
+                button
+                    .setButtonText('Save')
+                    .setClass(PRIMARY_BUTTON_CLASS)
+                    .onClick(async () => {
+                        await this.onSave();
+                        this.close();
+                    });
 
-            this.validateSaveButton();
-        });
+                this.validateSaveButton();
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Exporting#general')
+            );
     }
 
     private displayName(contentEl: HTMLElement) {
@@ -244,19 +248,23 @@ export default class ExportModal extends AnkiModal {
             'pencil'
         );
 
-        formatSection.addDropdown((dropdown) => {
-            dropdown
-                .addOptions({
-                    template: 'Template',
-                    regex: 'Regular expression',
-                })
-                .setValue(this.rule.type)
-                .onChange((format: ExportType) => {
-                    this.isFormatSwitch = format === this.rule.type;
-                    this.rule.type = format;
-                    this.addExportFormat(contentEl);
-                });
-        });
+        formatSection
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOptions({
+                        template: 'Template',
+                        regex: 'Regular expression',
+                    })
+                    .setValue(this.rule.type)
+                    .onChange((format: ExportType) => {
+                        this.isFormatSwitch = format === this.rule.type;
+                        this.rule.type = format;
+                        this.addExportFormat(contentEl);
+                    });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Exporting#format')
+            );
 
         switch (this.rule.type) {
             case 'template':
@@ -392,11 +400,13 @@ export default class ExportModal extends AnkiModal {
             cls: 'error',
         });
 
-        new Setting(contentEl)
+        const capturesSection = new Setting(contentEl)
             .setName('Captures')
             .setDesc(
                 'Map the fields of the note type to a specific capture group'
-            )
+            );
+
+        capturesSection
             .addExtraButton((button) => {
                 this.capturesButton = button;
 
@@ -411,7 +421,10 @@ export default class ExportModal extends AnkiModal {
 
                         this.addCaptureGroups(contentEl);
                     });
-            });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Regular-expressions#field-order')
+            );
 
         this.addCaptureGroups(contentEl);
         validate();
@@ -515,11 +528,15 @@ export default class ExportModal extends AnkiModal {
         const parent = this.fieldsDiv;
         parent.empty();
 
-        addSection(
+        const fieldsSection = addSection(
             parent,
             'Fields',
             'Control how and which fields are set from the regex',
             'list'
+        );
+
+        fieldsSection.addExtraButton((button) =>
+            setupWikiButton(button, 'Exporting#fields')
         );
 
         new Setting(parent)
@@ -565,7 +582,10 @@ export default class ExportModal extends AnkiModal {
     }
 
     private displayFiles(contentEl: HTMLElement) {
-        addSection(contentEl, 'Files', '', 'folder-sync');
+        const filesSection = addSection(contentEl, 'Files', '', 'folder-sync');
+        filesSection.addExtraButton((button) =>
+            setupWikiButton(button, 'Exporting#files')
+        );
 
         // Folder to scan in for notes to export
         new Setting(contentEl)

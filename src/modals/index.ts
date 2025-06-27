@@ -74,6 +74,9 @@ export function setupWikiButton(button: ExtraButtonComponent, section: string) {
             a.click();
             document.body.removeChild(a);
         });
+
+    // Setup stylines
+    button.extraSettingsEl.addClass('obsidi-anki-docs-icon');
 }
 
 export function validateTemplate(

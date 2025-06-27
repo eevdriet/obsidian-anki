@@ -1,11 +1,11 @@
-import { App, Modal, PluginSettingTab, Setting } from 'obsidian';
+import { App, Modal, PluginSettingTab, setIcon, Setting } from 'obsidian';
 
 import AnkiPlugin from 'plugin';
 import ExportModal from 'modals/export';
 import ImportModal from 'modals/import';
 import { sync } from 'anki/sync';
-import { PLUGIN, PRIMARY_BUTTON_CLASS } from 'common';
-import { addSection } from 'modals';
+import { PLUGIN, PRIMARY_BUTTON_CLASS, WIKI_URL } from 'common';
+import { addSection, setupWikiButton } from 'modals';
 import { DEFAULT_SETTINGS } from 'settings';
 import { ImportRule } from './import';
 import { ExportRule } from './export';
@@ -26,10 +26,30 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         // Create header
         containerEl.createEl('h1', { text: PLUGIN });
 
+        this.addWelcomeWord(containerEl);
         this.addSyncSettings(containerEl);
         this.addImportSettings(containerEl);
-
         this.addExporters(containerEl);
+    }
+
+    addWelcomeWord(containerEl: HTMLElement): void {
+        const header = containerEl.createEl('div');
+        header.appendText(
+            "Welcome! Here you can configure your own rules to sync your notes between Anki and Obsidian. If you're unsure on how to use the plugin you can check out the "
+        );
+        header.createEl('a', {
+            text: 'wiki',
+            href: WIKI_URL,
+            attr: { target: '_blank', rel: 'noopener' },
+        });
+        header.appendText(' by clicking on the ');
+
+        const infoIcon = header.createSpan();
+        setIcon(infoIcon, 'info');
+
+        header.appendText(' icons next to the various settings');
+
+        header.style.marginBottom = '1.5em';
     }
 
     addSyncSettings(containerEl: HTMLElement): void {
@@ -38,7 +58,7 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
             'Sync on startup',
             'Whether to sync with and import/export notes between Anki and Obsidian',
             'refresh-cw'
-        );
+        ).addExtraButton((button) => setupWikiButton(button, 'Syncing'));
 
         const syncSettings = this.plugin.settings.onload;
 
@@ -110,6 +130,7 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         });
         const importRules = this.plugin.settings.import.rules;
 
+        // New rule button
         importHeading.addButton((button) => {
             button
                 .setButtonText('New rule')
@@ -130,6 +151,11 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
                 });
         });
 
+        // Documentation button
+        importHeading.addExtraButton((button) =>
+            setupWikiButton(button, 'Importing')
+        );
+
         this.drawRules(importersDiv, importRules, ImportModal);
     }
 
@@ -147,6 +173,7 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         });
         const exportRules = this.plugin.settings.export.rules;
 
+        // Add new rule button
         exportHeading.addButton((button) => {
             button
                 .setButtonText('New rule')
@@ -166,6 +193,11 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
                     formModal.open();
                 });
         });
+
+        // Documentation button
+        exportHeading.addExtraButton((button) =>
+            setupWikiButton(button, 'Exporting')
+        );
 
         this.drawRules(exportersDiv, exportRules, ExportModal);
 
