@@ -19,7 +19,7 @@ export type ExportRule = {
         format: string;
 
         // Mapping of which field corresponds to which capture group
-        captures: Record<number, string>;
+        captures: Record<string, string>;
     };
 
     // Which deck to export the notes into

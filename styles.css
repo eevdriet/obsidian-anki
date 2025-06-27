@@ -73,3 +73,16 @@ a.external-url {
 .setting-item > *:first-child {
     margin-inline-end: var(--size-4-4);
 }
+
+.anki-capture-list-item {
+    position: relative;
+    padding-left: 1.5em; /* indent the whole block */
+}
+
+.anki-capture-list-item::before {
+    content: '*';
+    position: absolute;
+    left: 0;
+    font-size: 1em;
+    color: var(--text-muted); /* optional for subtlety */
+}

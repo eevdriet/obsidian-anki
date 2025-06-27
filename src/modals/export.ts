@@ -3,6 +3,7 @@ import AnkiModal, { validateTemplate } from 'modals';
 import {
     ButtonComponent,
     DropdownComponent,
+    ExtraButtonComponent,
     Setting,
     TextAreaComponent,
     TextComponent,
@@ -27,6 +28,9 @@ export default class ExportModal extends AnkiModal {
     saveButton?: ButtonComponent;
 
     fieldsDiv?: HTMLDivElement;
+    isFormatSwitch: boolean = false;
+    capturesOpened: boolean = false;
+    capturesButton?: ExtraButtonComponent;
     capturesDiv?: HTMLDivElement;
 
     constructor(name: string, plugin: AnkiPlugin, onSaveCallback: () => void) {
@@ -186,6 +190,9 @@ export default class ExportModal extends AnkiModal {
 
                         // Redisplay dependent parts of the modal
                         this.displayFields(contentEl);
+
+                        this.rule.regex.captures = {};
+                        this.addCaptureGroups(contentEl);
                     }
                 });
             });
@@ -218,6 +225,7 @@ export default class ExportModal extends AnkiModal {
     }
 
     private addExportFormat(contentEl: HTMLElement) {
+        console.info('All this (export)', this);
         if (this.exportDiv === undefined) {
             this.exportDiv = contentEl.createDiv();
             this.exportDiv.style.display = 'block';
@@ -243,6 +251,7 @@ export default class ExportModal extends AnkiModal {
                 })
                 .setValue(this.rule.type)
                 .onChange((format: ExportType) => {
+                    this.isFormatSwitch = format === this.rule.type;
                     this.rule.type = format;
                     this.addExportFormat(contentEl);
                 });
@@ -253,6 +262,9 @@ export default class ExportModal extends AnkiModal {
                 this.addTemplateExport(parentEl);
                 break;
             case 'regex':
+                this.capturesDiv = undefined;
+                this.capturesButton = undefined;
+
                 this.addRegexExport(parentEl);
                 break;
         }
@@ -372,22 +384,118 @@ export default class ExportModal extends AnkiModal {
             cls: 'error',
         });
 
-        new Setting(contentEl)
-            .setName('Captures')
-            .setDesc(
-                'Map the fields of the note type to a specific capture group'
-            )
-            .addExtraButton((button) => {
-                button
-                    .setIcon('plus')
-                    .setTooltip('Add new field capture')
-                    .onClick(() => {
-                        this.rule.regex.captures[0] = '';
-                        this.addCaptures(contentEl);
-                    });
-            });
+        addSection(
+            contentEl,
+            'Captures',
+            'Map the fields of the note type to a specific capture group',
+            'regex'
+        ).addExtraButton((button) => {
+            this.capturesButton = button;
 
-        this.addCaptures(contentEl);
+            button
+                .setIcon('chevron-right')
+                .setTooltip('Add new field capture')
+                .onClick(() => {
+                    // Captures open state should not change on redraw regex setting
+                    if (!this.isFormatSwitch) {
+                        this.capturesOpened = !this.capturesOpened;
+                    }
+
+                    this.addCaptureGroups(contentEl);
+                });
+        });
+
+        this.addCaptureGroups(contentEl);
+        validate();
+    }
+
+    private addCaptureGroups(contentEl: HTMLElement) {
+        const settings: Record<string, Setting> = {};
+
+        // Display whether the capture groups menu is opened
+        this.capturesButton?.setIcon(
+            this.capturesOpened ? 'chevron-down' : 'chevron-right'
+        );
+
+        // Create the element to draw the capture groups in
+        if (this.capturesDiv === undefined) {
+            this.capturesDiv = contentEl.createDiv();
+        }
+
+        const parent = this.capturesDiv;
+        parent.empty();
+
+        // Toggle whether to show the capture groups with the button
+        console.info('Capture groups', this);
+        if (!this.capturesOpened && !this.isFormatSwitch) {
+            return;
+        }
+
+        const validate = () => {
+            let isValid = true;
+            let message = 'Valid capture groups!';
+
+            if (
+                Object.values(this.rule.regex.captures).every(
+                    (group) => group === ''
+                )
+            ) {
+                isValid = false;
+                message = 'At least one field needs to be captured';
+            }
+
+            if (!isValid) {
+                // regexInput.inputEl.addClass('error');
+                Object.values(settings).forEach((setting) =>
+                    setting.nameEl.addClass('error')
+                );
+                regexWarningEl.setText(message);
+            } else {
+                Object.values(settings).forEach((setting) =>
+                    setting.nameEl.removeClass('error')
+                );
+                regexWarningEl.setText('');
+            }
+
+            this.isValidFormat = isValid;
+            this.validateSaveButton();
+
+            return isValid;
+        };
+
+        const captures = this.rule.regex.captures;
+        const fields = this.plugin.fields[this.rule.noteType] ?? [];
+
+        for (let idx = 0; idx < fields.length; idx++) {
+            const field = fields[idx];
+
+            const group = (captures[field] ??= `${idx + 1}`);
+
+            const setting = new Setting(parent)
+                .setName(field)
+                .addDropdown((groupDropdown) => {
+                    const groups = [''].concat(
+                        [...Array(fields.length)].map((_, i) => `${i + 1}`)
+                    );
+
+                    groups.forEach((group) =>
+                        groupDropdown.addOption(`${group}`, `${group}`)
+                    );
+                    groupDropdown.setValue(`${group}`);
+                    groupDropdown.onChange((newGroup) => {
+                        captures[field] = newGroup;
+                        this.addCaptureGroups(contentEl);
+                    });
+                });
+
+            settings[field] = setting;
+            setting.settingEl.classList.add('anki-capture-list-item');
+        }
+
+        const regexWarningEl = parent.createDiv({
+            cls: 'error',
+        });
+
         validate();
     }
 
@@ -446,58 +554,6 @@ export default class ExportModal extends AnkiModal {
                         this.rule.link.enabled = value;
                     });
             });
-    }
-
-    private addCaptures(contentEl: HTMLElement) {
-        const captures = this.rule.regex.captures;
-
-        if (this.capturesDiv === undefined) {
-            this.capturesDiv = contentEl.createDiv();
-        }
-
-        const parent = this.capturesDiv;
-        parent.empty();
-
-        for (const [group, field] of Object.entries(captures)) {
-            console.info(`\t'${group}': '${field}'`);
-            const setting = new Setting(parent);
-
-            setting
-                .addDropdown((groupDropdown) => {
-                    const groups = [...Array(10)].map((_, i) => i + 1);
-
-                    groups.forEach((group) =>
-                        groupDropdown.addOption(`${group}`, `${group}`)
-                    );
-                    groupDropdown.setValue(group);
-                    groupDropdown.onChange((newGroup) => {
-                        delete captures[+group];
-                        captures[+newGroup] = field;
-                        this.addCaptures(contentEl);
-                    });
-                })
-                .addDropdown((fieldDropdown) => {
-                    const fields = this.plugin.fields[this.rule.noteType] ?? [];
-
-                    fields.forEach((type) =>
-                        fieldDropdown.addOption(type, type)
-                    );
-                    fieldDropdown.setValue(field);
-                    fieldDropdown.onChange((value) => {
-                        captures[+group] = value;
-                        this.addCaptures(contentEl);
-                    });
-                })
-                .addExtraButton((button) =>
-                    button
-                        .setTooltip('Delete field capture')
-                        .setIcon('cross')
-                        .onClick(() => {
-                            delete captures[+group];
-                            this.addCaptures(contentEl);
-                        })
-                );
-        }
     }
 
     private displayFiles(contentEl: HTMLElement) {
