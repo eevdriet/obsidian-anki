@@ -436,6 +436,20 @@ export default class ExportModal extends AnkiModal {
                         this.addCaptureGroups(contentEl);
                     });
             })
+            .addExtraButton((button) => {
+                button
+                    .setIcon('list-restart')
+                    .setTooltip('Reset field order')
+                    .onClick(() => {
+                        Object.keys(this.rule.regex.captures).forEach(
+                            (field, idx) => {
+                                this.rule.regex.captures[field] = `${idx + 1}`;
+                            }
+                        );
+
+                        this.addCaptureGroups(contentEl);
+                    });
+            })
             .addExtraButton((button) =>
                 setupWikiButton(button, 'Regular-expressions#field-order')
             );
