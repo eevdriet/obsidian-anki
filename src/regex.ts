@@ -9,6 +9,12 @@ function createListRegex(regex: RegExp) {
     );
 }
 
+export function countCaptureGroups(regex: RegExp): number {
+    const groups = [...regex.source.matchAll(/(?<!\\)(\()(?!\?:)/g)];
+
+    return groups.length;
+}
+
 function createPatternsRegex(patterns: string[]): RegExp {
     return new RegExp(`(?:${patterns.join('|')})`, 'gm');
 }

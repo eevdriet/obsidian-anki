@@ -13,6 +13,7 @@ import AnkiPlugin from 'plugin';
 import { DEFAULT_EXPORT_RULE, ExportType, ExportRule } from 'settings/export';
 import { addSection } from 'modals';
 import { FolderSuggest, TextSuggest } from './suggest';
+import { countCaptureGroups } from 'regex';
 
 export default class ExportModal extends AnkiModal {
     initialName: string;
@@ -94,22 +95,34 @@ export default class ExportModal extends AnkiModal {
         let name: TextComponent;
 
         const validate = () => {
-            const value = name.getValue();
-            const isValid = !(value === undefined || value === '');
+            const checkValidity = (): [boolean, string | undefined, string] => {
+                const value = name.getValue();
 
-            if (!isValid) {
-                name.inputEl.addClass('error');
-                nameWarningEl.addClass('error');
-                nameWarningEl.setText('Name cannot be empty!');
-            } else if (
-                value !== this.initialName &&
-                Object(this.rules).hasOwnProperty(value)
-            ) {
-                name.inputEl.addClass('warning');
-                nameWarningEl.addClass('warning');
-                nameWarningEl.setText(
-                    'Rule with this name already exists! Only save if you want to override it'
-                );
+                if (value === undefined || value === '') {
+                    return [false, 'error', 'Name cannot be empty!'];
+                }
+
+                if (
+                    value !== this.initialName &&
+                    Object(this.rules).hasOwnProperty(value)
+                ) {
+                    return [
+                        true,
+                        'warning',
+                        'Another rule with this name already exists! Only save if you want to override it',
+                    ];
+                }
+
+                return [true, undefined, 'Valid name!'];
+            };
+
+            // Check whether the name is valid and setting possible error/warning messages
+            const [isValid, type, message] = checkValidity();
+
+            if (type !== undefined) {
+                name.inputEl.addClass(type);
+                nameWarningEl.addClass(type);
+                nameWarningEl.setText(message);
             } else {
                 name.inputEl.removeClass('error', 'warning');
                 nameWarningEl.removeClass('error', 'warning');
@@ -345,11 +358,9 @@ export default class ExportModal extends AnkiModal {
 
             try {
                 const regex = new RegExp(value);
+                const nGroups = countCaptureGroups(regex);
 
-                const groups = [
-                    ...regex.source.matchAll(/(?<!\\)(\()(?!\?:)/g),
-                ];
-                if (groups.length === 0) {
+                if (nGroups === 0) {
                     isValid = false;
                     message = 'No capture groups to capture fields';
                 }
@@ -385,10 +396,13 @@ export default class ExportModal extends AnkiModal {
 
                 text.setPlaceholder('Regular expression');
                 text.onChange((value) => {
-                    validate();
+                    const isValid = validate();
 
-                    this.rule.regex.format = value;
-                    this.displayFields(contentEl);
+                    if (isValid) {
+                        this.rule.regex.format = value;
+                        this.displayFields(contentEl);
+                        this.addCaptureGroups(contentEl);
+                    }
                 });
                 text.setValue(this.rule.regex.format);
             });
@@ -432,6 +446,7 @@ export default class ExportModal extends AnkiModal {
 
     private addCaptureGroups(contentEl: HTMLElement) {
         const settings: Record<string, Setting> = {};
+        const nGroups = countCaptureGroups(new RegExp(this.rule.regex.format));
 
         // Display whether the capture groups menu is opened
         this.capturesButton?.setIcon(
@@ -447,35 +462,97 @@ export default class ExportModal extends AnkiModal {
         parent.empty();
 
         // Toggle whether to show the capture groups with the button
-        console.info('Capture groups', this);
         if (!this.capturesOpened && !this.isFormatSwitch) {
             return;
         }
 
         const validate = () => {
-            let isValid = true;
-            let message = 'Valid capture groups!';
+            const checkValidity = (): [
+                boolean,
+                string | undefined,
+                number[],
+                string,
+            ] => {
+                const captures = Object.values(this.rule.regex.captures);
+                console.info('Captures', { ...this.rule.regex.captures });
 
-            if (
-                Object.values(this.rule.regex.captures).every(
-                    (group) => group === ''
-                )
-            ) {
-                isValid = false;
-                message = 'At least one field needs to be captured';
-            }
+                // No field is captured
+                if (captures.every((group) => group === '')) {
+                    return [
+                        false,
+                        'error',
+                        captures.map((_, idx) => idx),
+                        'At least one field needs to be captured',
+                    ];
+                }
 
-            if (!isValid) {
-                // regexInput.inputEl.addClass('error');
-                Object.values(settings).forEach((setting) =>
-                    setting.nameEl.addClass('error')
-                );
+                // Fields set by non-existing capture group
+                const tooHighCaptures = captures
+                    .map((capture, idx) => ({ capture, idx }))
+                    .filter(
+                        ({ capture }) =>
+                            capture !== '' && Number(capture) > nGroups
+                    )
+                    .map(({ idx }) => idx);
+
+                if (tooHighCaptures.length > 0) {
+                    return [
+                        true,
+                        'warning',
+                        tooHighCaptures,
+                        `One or more fields are set by non-existing capture group (regex has ${nGroups} groups)`,
+                    ];
+                }
+
+                // Fields are captured by the same capture group
+                const duplicateCaptures = captures
+                    .map((capture, idx) => ({ capture, idx }))
+                    .filter(
+                        ({ capture }) =>
+                            capture !== '' &&
+                            captures.indexOf(capture) !==
+                                captures.lastIndexOf(capture)
+                    )
+                    .map(({ idx }) => idx);
+
+                if (duplicateCaptures.length > 0) {
+                    return [
+                        true,
+                        'warning',
+                        duplicateCaptures,
+                        `Two or more fields are set by the same capture group`,
+                    ];
+                }
+
+                return [true, undefined, [], 'Valid capture groups!'];
+            };
+
+            // Check whether the name is valid and setting possible error/warning messages
+            const [isValid, type, indices, message] = checkValidity();
+
+            if (type !== undefined) {
+                regexWarningEl.addClass(type);
                 regexWarningEl.setText(message);
+
+                Object.values(settings)
+                    .filter((_, idx) => indices.includes(idx))
+                    .forEach((setting) => {
+                        setting.nameEl.addClass(type);
+                        setting.controlEl.addClass(type);
+                        setting.controlEl
+                            .querySelector('select')
+                            ?.addClass(type);
+                    });
             } else {
-                Object.values(settings).forEach((setting) =>
-                    setting.nameEl.removeClass('error')
-                );
+                regexWarningEl.addClass('error', 'warning');
                 regexWarningEl.setText('');
+
+                Object.values(settings).forEach((setting) => {
+                    setting.nameEl.removeClass('error', 'warning');
+                    setting.controlEl
+                        .querySelector('select')
+                        ?.removeClass('error', 'warning');
+                });
             }
 
             this.isValidFormat = isValid;
@@ -489,7 +566,6 @@ export default class ExportModal extends AnkiModal {
 
         for (let idx = 0; idx < fields.length; idx++) {
             const field = fields[idx];
-
             const group = (captures[field] ??= `${idx + 1}`);
 
             const setting = new Setting(parent)
@@ -499,8 +575,8 @@ export default class ExportModal extends AnkiModal {
                         [...Array(fields.length)].map((_, i) => `${i + 1}`)
                     );
 
-                    groups.forEach((group) =>
-                        groupDropdown.addOption(`${group}`, `${group}`)
+                    groups.forEach((g) =>
+                        groupDropdown.addOption(`${g}`, `${g}`)
                     );
                     groupDropdown.setValue(`${group}`);
                     groupDropdown.onChange((newGroup) => {
