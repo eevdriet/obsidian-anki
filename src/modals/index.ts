@@ -3,6 +3,14 @@ import { ExtraButtonComponent, Modal, setIcon, Setting } from 'obsidian';
 import AnkiPlugin from 'plugin';
 import { ANKI_PATTERN_REGEX } from 'regex';
 
+/**
+ * Return type for validity checking functions, consisting of
+ * - whether the argument is valid
+ * - type of validity (error, warning or nothing)
+ * - message in case of an error or warning
+ */
+export type Validity = [boolean, string | undefined, string];
+
 export default abstract class AnkiModal extends Modal {
     plugin: AnkiPlugin;
     onSaveCallback: () => void;
@@ -16,20 +24,18 @@ export default abstract class AnkiModal extends Modal {
 
     protected abstract display(): void;
 
-    async onSave(): Promise<void> {
-        await this.plugin.save();
-        this.onSaveCallback();
-    }
-
     onOpen(): void {
         this.modalEl.style.width = '1000px';
         this.modalEl.style.height = 'auto';
         this.display();
     }
 
-    onClose() {
+    async onClose() {
         const { contentEl } = this;
         contentEl.empty();
+
+        await this.plugin.save();
+        this.onSaveCallback();
     }
 }
 
@@ -82,13 +88,14 @@ export function setupWikiButton(button: ExtraButtonComponent, section: string) {
 export function validateTemplate(
     template: string,
     noteFields: string[],
-    includeTemplateFields: boolean = false
-): [boolean, string] {
+    includeTemplateFields: boolean = false,
+    allowNoText: boolean = false
+): Validity {
     const fields = [...template.matchAll(ANKI_PATTERN_REGEX)];
     const names = fields.map((field) => field[1]);
 
     if (fields.length === 0) {
-        return [false, 'Template has no {{...}} replacement patterns'];
+        return [false, 'error', 'Template has no {{...}} replacement patterns'];
     }
 
     // At least 1 {{Field}} name required
@@ -106,7 +113,7 @@ export function validateTemplate(
         if (includeTemplateFields) {
             message = `Template should have {{Fields}} or at least one {{Field}} replacement:\n${fieldsStr}`;
         }
-        return [false, message];
+        return [false, 'error', message];
     }
 
     // No two patterns only separated by whitespace on the same line
@@ -117,15 +124,15 @@ export function validateTemplate(
     if ((template.match(twoPatternRegex) ?? []).length > 0) {
         const message =
             'Template cannot have two {{...}} patterns only separated by whitespace';
-        return [false, message];
+        return [false, 'error', message];
     }
 
     // At least some non-whitespace literal text
     const noPatternTemplate = template.replace(ANKI_PATTERN_REGEX, '');
-    if (!/\S/.test(noPatternTemplate)) {
+    if (!allowNoText && !/\S/.test(noPatternTemplate)) {
         const message =
             'Template must contain some non-whitespace literal text';
-        return [false, message];
+        return [false, 'error', message];
     }
 
     // Invalid {{Field}} name
@@ -143,8 +150,67 @@ export function validateTemplate(
     or replace a field directly:\n${fieldsStr}`;
         }
 
-        return [false, message];
+        return [false, 'error', message];
     }
 
-    return [true, ''];
+    return [true, undefined, ''];
+}
+
+export function validateName(
+    name: string,
+    prevName: string,
+    allNames: string[]
+): Validity {
+    if (name === undefined || name === '') {
+        return [false, 'error', 'Name cannot be empty'];
+    }
+
+    if (name !== prevName && allNames.includes(name)) {
+        return [false, 'error', 'Another rule with this name already exists'];
+    }
+
+    return [true, undefined, 'Valid name!'];
+}
+
+export function validateNoteType(type: string): Validity {
+    if (type === undefined || type === '') {
+        return [
+            false,
+            'error',
+            'Note type cannot be empty! Sync with Anki to retrieve available types',
+        ];
+    }
+
+    return [true, undefined, 'Note type is valid'];
+}
+
+export function validate(
+    validator: () => Validity,
+    messageEl: HTMLElement,
+    ...displayEls: HTMLElement[]
+): boolean {
+    // Perform validation and retrieve validaty type and possible error message
+    const [isValid, type, message] = validator();
+
+    // Not (completely) valid: set message and display type of non-validity
+    if (type !== undefined) {
+        messageEl.setText(message);
+        messageEl.addClass(type);
+
+        displayEls.forEach((displayEl) => {
+            displayEl.addClass(type);
+        });
+    }
+
+    // Valid: clear message and display(s)
+    else {
+        messageEl.setText('');
+        messageEl.removeClass('error', 'warning');
+
+        displayEls.forEach((displayEl) => {
+            displayEl.removeClass('error', 'warning');
+        });
+    }
+
+    return isValid;
 }

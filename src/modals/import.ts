@@ -1,5 +1,12 @@
-import { PLUGIN, PRIMARY_BUTTON_CLASS } from 'common';
-import AnkiModal, { setupWikiButton, validateTemplate } from 'modals';
+import { message, PLUGIN } from 'common';
+import AnkiModal, {
+    setupWikiButton,
+    validate,
+    validateName,
+    validateNoteType,
+    validateTemplate,
+    Validity,
+} from 'modals';
 import {
     ButtonComponent,
     DropdownComponent,
@@ -16,40 +23,39 @@ import {
 } from 'settings/import';
 import { FileSuggest, FolderSuggest } from './suggest';
 import { addSection } from 'modals';
+import { valid } from 'node-html-parser';
 
 export default class ImportModal extends AnkiModal {
-    initialName: string;
-    currName: string;
+    name: string;
+    origName: string;
 
     rule: ImportRule;
-    defaultRule: ImportRule;
     rules: Record<string, ImportRule>;
+
+    templateDiv?: HTMLElement;
+    importDiv?: HTMLElement;
 
     isValidName: boolean = true;
     isValidNoteType: boolean = true;
     isValidTemplate: boolean = true;
     isValidFolderFileFormat: boolean = true;
 
-    templateDiv?: HTMLElement;
-    importDiv?: HTMLElement;
     saveButton?: ButtonComponent;
 
     constructor(name: string, plugin: AnkiPlugin, onSaveCallback: () => void) {
         super(plugin, onSaveCallback);
-
-        this.plugin = plugin;
-        this.initialName = name;
-        this.currName = name;
+        this.name = name;
+        this.origName = name;
 
         this.rules = this.plugin.settings.import.rules;
-        this.rule = this.rules[name] ?? { ...DEFAULT_IMPORT_RULE };
+        this.rule = this.rules[this.name] ?? { ...DEFAULT_IMPORT_RULE };
     }
 
-    override async onSave(): Promise<void> {
-        delete this.rules[this.initialName];
-        this.rules[this.currName] = this.rule;
+    override async onClose(): Promise<void> {
+        delete this.rules[this.origName];
+        this.rules[this.name] = this.rule;
 
-        super.onSave();
+        super.onClose();
     }
 
     override display() {
@@ -65,54 +71,52 @@ export default class ImportModal extends AnkiModal {
         this.displayTag(contentEl);
 
         this.displayDuplicate(contentEl);
-
         this.displayDestination(contentEl);
+
+        this.validateSaveButton();
     }
 
     private displayGeneral(contentEl: HTMLElement) {
-        const action = this.initialName === '?' ? 'Create' : 'Edit';
+        const action = this.origName === '?' ? 'Create' : 'Edit';
         contentEl.createEl('h1', { text: `${action} importer` });
 
         const section = addSection(contentEl, 'General', '', 'cog');
-        section.addButton((button) => {
-            this.saveButton = button;
-            button
-                .setButtonText('Save')
-                .setClass(PRIMARY_BUTTON_CLASS)
-                .onClick(async () => {
-                    await this.onSave();
-                    this.close();
-                });
-        });
-        section.addExtraButton((button) =>
-            setupWikiButton(button, 'Importing#general')
-        );
 
-        this.validateSaveButton();
+        section
+            .addButton((button) => {
+                button
+                    .setButtonText('Save')
+                    .setTooltip('Save')
+                    .setCta()
+                    .onClick(() => {
+                        delete this.rules[this.origName];
+                        this.rules[this.name] = this.rule;
+
+                        message(`${this.name} saved!`);
+                    });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Importing#general')
+            );
     }
 
     private displayName(contentEl: HTMLElement) {
         let nameInput: TextComponent;
 
-        const validate = () => {
-            const value = nameInput.getValue();
+        const validateRuleName = () =>
+            validate(
+                () =>
+                    validateName(
+                        nameInput.getValue(),
+                        this.origName,
+                        Object.keys(this.rules)
+                    ),
+                messageEl,
+                nameInput.inputEl,
+                setting.nameEl
+            );
 
-            const isValid = value !== undefined && value !== '';
-            if (isValid) {
-                nameInput.inputEl.removeClass('error');
-                nameWarningEl.setText('');
-            } else {
-                nameInput.inputEl.addClass('error');
-                nameWarningEl.setText('Name cannot be empty!');
-            }
-
-            this.isValidName = isValid;
-            this.validateSaveButton();
-
-            return isValid;
-        };
-
-        new Setting(contentEl)
+        const setting = new Setting(contentEl)
             .setName('Name')
             .setDesc('Name of the rule to apply')
             .addText((text) => {
@@ -123,52 +127,40 @@ export default class ImportModal extends AnkiModal {
                     type === '' || type === undefined ? 'New rule' : type;
 
                 text.setPlaceholder(placeholder)
-                    .setValue(this.currName)
+                    .setValue(this.name)
                     .onChange((value) => {
-                        const isValid = validate();
+                        const isValid = validateRuleName();
+
                         if (isValid) {
-                            this.currName = value;
+                            this.name = value;
                         }
                     });
             });
 
-        const nameWarningEl = contentEl.createEl('div', {
-            cls: 'error',
-            text: '',
+        const messageEl = contentEl.createEl('div', {
+            cls: 'setting-message-item',
         });
 
-        validate();
+        validateRuleName();
     }
 
     private displayNoteType(contentEl: HTMLElement) {
         // Select note type
-        let noteType: DropdownComponent;
+        let noteTypeInputEl: DropdownComponent;
 
-        const validate = () => {
-            const value = noteType.getValue();
+        const validateType = () =>
+            validate(
+                () => validateNoteType(noteTypeInputEl.getValue()),
+                messageEl,
+                noteTypeInputEl.selectEl,
+                setting.nameEl
+            );
 
-            const isValid = value !== undefined && value !== '';
-            if (isValid) {
-                noteType.selectEl.removeClass('error');
-                noteWarningEl.setText('');
-            } else {
-                noteType.selectEl.addClass('error');
-                noteWarningEl.setText(
-                    'Note type cannot be empty! Sync with Anki to retrieve available types'
-                );
-            }
-
-            this.isValidNoteType = isValid;
-            this.validateSaveButton();
-
-            return isValid;
-        };
-
-        new Setting(contentEl)
+        const setting = new Setting(contentEl)
             .setName('Note type')
             .setDesc('Select the note type to importer')
             .addDropdown((dropdown) => {
-                noteType = dropdown;
+                noteTypeInputEl = dropdown;
 
                 // Find all types that have no exporter defined for them yet
                 const types = this.plugin.noteTypes ?? [];
@@ -183,7 +175,9 @@ export default class ImportModal extends AnkiModal {
 
                 dropdown.setValue(type);
                 dropdown.onChange((value) => {
-                    if (validate()) {
+                    this.isValidNoteType = validateType();
+
+                    if (this.isValidNoteType) {
                         this.rule.noteType = value;
 
                         // Redisplay dependent parts of the modal
@@ -193,12 +187,11 @@ export default class ImportModal extends AnkiModal {
                 });
             });
 
-        const noteWarningEl = contentEl.createEl('div', {
-            cls: 'error',
-            text: '',
+        const messageEl = contentEl.createEl('div', {
+            cls: 'setting-message-item',
         });
 
-        validate();
+        validateType();
     }
 
     private displayQuery(contentEl: HTMLElement) {
@@ -233,7 +226,7 @@ export default class ImportModal extends AnkiModal {
         parentEl.empty();
 
         // Header
-        addSection(
+        const section = addSection(
             parentEl,
             'Template',
             'Write the template to import Anki notes',
@@ -242,30 +235,22 @@ export default class ImportModal extends AnkiModal {
 
         let templateInput: TextAreaComponent;
 
-        const validate = () => {
-            const value = templateInput?.getValue() ?? '';
-            const noteFields = this.plugin.fields
-                ? this.plugin.fields[this.rule.noteType]
-                : [];
+        const validateFormat = () =>
+            validate(
+                () => {
+                    const value = templateInput?.getValue() ?? '';
+                    const noteFields = this.plugin.fields
+                        ? this.plugin.fields[this.rule.noteType]
+                        : [];
 
-            const [isValid, message] = validateTemplate(
-                value,
-                noteFields,
-                true
+                    return validateTemplate(value, noteFields, true);
+                },
+                messageEl,
+                templateInput.inputEl,
+                section.nameEl
             );
-            if (!isValid) {
-                templateInput.inputEl.addClass('error');
-                templateWarningEl.setText(message);
-            } else {
-                templateInput.inputEl.removeClass('error');
-                templateWarningEl.setText('');
-            }
 
-            this.isValidTemplate = isValid;
-            this.validateSaveButton();
-        };
-
-        const templateTextEl = new Setting(parentEl).addTextArea((text) => {
+        const setting = new Setting(parentEl).addTextArea((text) => {
             templateInput = text;
             text.inputEl.rows = 10;
             text.inputEl.cols = 220;
@@ -273,20 +258,23 @@ export default class ImportModal extends AnkiModal {
             text.setPlaceholder('Template')
                 .setValue(this.rule.template)
                 .onChange((value) => {
-                    this.rule.template = value;
-                    validate();
+                    this.isValidTemplate = validateFormat();
+
+                    if (this.isValidTemplate) {
+                        this.rule.template = value;
+                    }
                 });
         });
 
-        templateTextEl.controlEl.style.width = '100%';
-        templateTextEl.settingEl.style.margin = '0px';
+        setting.controlEl.style.width = '100%';
+        setting.settingEl.style.margin = '0px';
 
-        const templateWarningEl = parentEl.createDiv({
-            cls: 'error',
+        const messageEl = parentEl.createDiv({
+            cls: 'setting-message-item',
         });
-        templateWarningEl.style.whiteSpace = 'pre-wrap';
+        messageEl.style.whiteSpace = 'pre-wrap';
 
-        validate();
+        this.isValidTemplate = validateFormat();
     }
 
     private displayTag(contentEl: HTMLElement) {
@@ -452,26 +440,22 @@ export default class ImportModal extends AnkiModal {
 
         let fileNameInput: TextComponent;
 
-        const validate = () => {
-            const value = fileNameInput?.getValue() ?? '';
-            const noteFields = this.plugin.fields
-                ? this.plugin.fields[this.rule.noteType]
-                : [];
+        const validateFileName = () =>
+            validate(
+                () => {
+                    const value = fileNameInput?.getValue() ?? '';
+                    const noteFields = this.plugin.fields
+                        ? this.plugin.fields[this.rule.noteType]
+                        : [];
 
-            const [isValid, message] = validateTemplate(value, noteFields);
-            if (!isValid) {
-                fileNameInput.inputEl.addClass('error');
-                fileNameWarningEl.setText(message);
-            } else {
-                fileNameInput.inputEl.removeClass('error');
-                fileNameWarningEl.setText('');
-            }
+                    return validateTemplate(value, noteFields, false, true);
+                },
+                messageEl,
+                fileNameInput.inputEl,
+                setting.nameEl
+            );
 
-            this.isValidFolderFileFormat = isValid;
-            this.validateSaveButton();
-        };
-
-        new Setting(contentEl)
+        const setting = new Setting(contentEl)
             .setName('File name format')
             .setDesc(
                 'Format of the file name for each note. Should be based on a field that is unique to each note'
@@ -482,17 +466,20 @@ export default class ImportModal extends AnkiModal {
                 text.setPlaceholder(DEFAULT_IMPORT_RULE.folder.fileFormat)
                     .setValue(this.rule.folder.fileFormat)
                     .onChange((value) => {
-                        validate();
-                        this.rule.folder.fileFormat = value;
+                        this.isValidFolderFileFormat = validateFileName();
+
+                        if (this.isValidFolderFileFormat) {
+                            this.rule.folder.fileFormat = value;
+                        }
                     });
             });
 
-        const fileNameWarningEl = contentEl.createDiv({
-            cls: 'error',
+        const messageEl = contentEl.createDiv({
+            cls: 'setting-message-item',
         });
-        fileNameWarningEl.style.whiteSpace = 'pre-wrap';
+        messageEl.style.whiteSpace = 'pre-wrap';
 
-        validate();
+        this.isValidFolderFileFormat = validateFileName();
     }
 
     private displayFileImport(contentEl: HTMLElement) {
@@ -510,8 +497,11 @@ export default class ImportModal extends AnkiModal {
     }
 
     private validateSaveButton() {
-        let isValid = this.isValidNoteType && this.isValidTemplate;
-        isValid &&= this.rule.type !== 'folder' || this.isValidFolderFileFormat;
+        const isValid =
+            this.isValidName &&
+            this.isValidNoteType &&
+            this.isValidTemplate &&
+            this.isValidFolderFileFormat;
 
         this.saveButton?.setDisabled(!isValid);
     }

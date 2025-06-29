@@ -134,7 +134,7 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         importHeading.addButton((button) => {
             button
                 .setButtonText('New rule')
-                .setClass(PRIMARY_BUTTON_CLASS)
+                .setCta()
                 .onClick(() => {
                     const formModal = new ImportModal(
                         'New rule',
@@ -177,7 +177,7 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         exportHeading.addButton((button) => {
             button
                 .setButtonText('New rule')
-                .setClass(PRIMARY_BUTTON_CLASS)
+                .setCta()
                 .onClick(() => {
                     const formModal = new ExportModal(
                         'New rule',

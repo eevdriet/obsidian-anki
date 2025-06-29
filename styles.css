@@ -69,6 +69,7 @@ textarea.warning {
 
 .setting-item.setting-item-heading:has(.obsidi-anki-settings-icon)
     ~ .setting-item:not(.setting-item-heading),
+.setting-message-item,
 .obsidi-anki-snippet-variables-setting + .setting-item-control {
     width: calc(100% - 26px);
     margin-left: 26px;
