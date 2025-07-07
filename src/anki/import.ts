@@ -1,4 +1,5 @@
 import { File } from './file';
+import { moment } from 'obsidian';
 import AnkiPlugin from 'plugin';
 import ImportFormatter from 'format/import';
 import * as AnkiConnect from 'anki/connect';
@@ -6,7 +7,13 @@ import { Note, NoteStatus } from './note';
 import { escapeFileName, formatTemplate } from 'format';
 import NoteScanner from './scanner';
 import { ImportRule } from 'settings/import';
-import { NOTE_START_COMMENT, NOTE_END_COMMENT, createComment } from 'regex';
+import {
+    NOTE_START_COMMENT,
+    NOTE_END_COMMENT,
+    createComment,
+    NOTE_DATE_COMMENT_REGEX,
+    createTimeStampComment,
+} from 'regex';
 import { debug, errorMessage, message, successMessage } from 'common';
 import { CardInfo } from './card';
 
@@ -28,19 +35,24 @@ export default class Importer extends NoteScanner {
         try {
             // Determine which notes can be imported to Anki
             await this.scanVault();
-            console.info('Scan vault', [...this.ankiNotes.values()]);
             await this.findImportNotes();
-            console.info('Import notes', [...this.ankiNotes.values()]);
 
-            const allNotes = [...this.ankiNotes.values()];
+            const allNotes = [...this.ankiNotes.values()].map((note) =>
+                this.formatter.format(note)
+            );
             if (allNotes.length === 0) {
                 debug('No notes imported from Anki');
                 return;
             }
 
             // Perform Obsidian actions
+            debug('Create import notes (start)');
             await this.createNotes(allNotes);
+            debug('Create import notes (end)');
+
+            debug('Update import notes (start)');
             await this.updateNotes(allNotes);
+            debug('Update import notes (end)');
 
             await this.writeFiles();
 
@@ -53,7 +65,7 @@ export default class Importer extends NoteScanner {
     private async findImportNotes() {
         this.ankiNotes.clear();
 
-        debug('Find import notes (begin)');
+        debug('Find import notes (start)');
         const rules = Object.values(this.plugin.settings.import.rules).filter(
             (rule) => rule.enabled
         );
@@ -64,12 +76,11 @@ export default class Importer extends NoteScanner {
 
             let query = rule.query;
             if (!query.includes(typeArg)) {
-                query = `(${query}) AND ${typeArg}`;
+                query = query !== '' ? `(${query}) AND ${typeArg}` : typeArg;
             }
 
             return AnkiConnect.getNotes(query);
         });
-        console.info('Responses', responses);
 
         // Parse the responses for each rules
         const allAnkiNotes = await Promise.all(responses);
@@ -106,6 +117,7 @@ export default class Importer extends NoteScanner {
 
                 if (noteExists && action === 'update') {
                     note.status = NoteStatus.IMPORT_UPDATE;
+                    note.lastImport = this.notesWithId.get(note.id)!.lastImport;
                 } else if (!noteExists || action === 'append') {
                     note.status = NoteStatus.IMPORT_CREATE;
                 }
@@ -158,7 +170,7 @@ export default class Importer extends NoteScanner {
                 note.deck = decks[0];
             }
 
-            note.setTextFromTemplate(rule.template);
+            note.setFromTemplate(rule.template);
         }
 
         debug('Find import notes (end)');
@@ -179,13 +191,13 @@ export default class Importer extends NoteScanner {
     }
 
     private async createNotes(ankiNotes: Note[]) {
-        debug('Create import notes (begin)');
-
         // Determine which notes to add to Obsidian
         const notesToCreate = ankiNotes.filter(
             (note) => note.status === NoteStatus.IMPORT_CREATE
         );
-        debug('Create notes', notesToCreate);
+        if (notesToCreate.length === 0) {
+            return;
+        }
 
         notesToCreate.forEach((note) => {
             if (!note.file || !note.id) {
@@ -214,13 +226,11 @@ export default class Importer extends NoteScanner {
             }
 
             // Insert the note into its file
-            const idComment = createComment(`Note id: ${note.id!}`);
-            const text = `${NOTE_START_COMMENT}\n${note.text}\n${idComment}\n${NOTE_END_COMMENT}\n\n`;
-
-            note.file.insert(text, pos);
+            note.file?.insert(note.text('import'), pos);
+            this.plugin.notes.add(note.id);
         });
 
-        debug('Create import notes (end)');
+        await this.plugin.save();
     }
 
     private async updateNotes(ankiNotes: Note[]) {
@@ -228,8 +238,13 @@ export default class Importer extends NoteScanner {
         const notesToUpdate = ankiNotes.filter(
             (note) => note.status === NoteStatus.IMPORT_UPDATE
         );
-
-        debug('Update notes', notesToUpdate);
+        if (notesToUpdate.length === 0) {
+            return;
+        }
+        console.log(
+            'Update notes',
+            notesToUpdate.map((note) => note.clone())
+        );
 
         for (const ankiNote of notesToUpdate) {
             // Determine which Obsidian note corresponds to an (updated) Anki note
@@ -237,14 +252,25 @@ export default class Importer extends NoteScanner {
                 return;
             }
 
-            const obsNote = this.notesWithId.get(ankiNote.id);
-            if (!obsNote) {
+            const note = this.notesWithId.get(ankiNote.id);
+            if (!note) {
                 return;
             }
 
-            // Carry across properties from Anki note to Obsidian
-            obsNote.file?.replace(obsNote.text, ankiNote.text);
+            // Replace the contents of the note
+            const noteBefore = note.text('import');
+
+            note.note = ankiNote.note;
+            note.lastImport = moment();
+
+            const noteAfter = note.text('import');
+
+            // Replace the note within the file
+            note.file?.replace(noteBefore, noteAfter);
+            this.plugin.notes.add(note.id!);
         }
+
+        await this.plugin.save();
     }
 
     private async findFile(path: string, rule: ImportRule): Promise<File> {

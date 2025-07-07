@@ -1,4 +1,5 @@
 import { escapeField, escapeRegex } from 'format';
+import moment, { Moment } from 'moment';
 
 // Utils
 export const LIST_SEP_REGEX = /,\s*?/g;
@@ -41,8 +42,16 @@ export const ANKI_CLOZE_REGEX =
 export const createComment = (text: string): string => {
     return `<!-- ${text} -->`;
 };
-export const createCommentRegex = (text: string): RegExp => {
-    return new RegExp(`^\\s*<!--\\s*${text}\\s*\\s*-->\\s*$`, 'im');
+export const createCommentRegex = (
+    text: string,
+    withLineDelims: boolean = true
+): RegExp => {
+    let regex = `\\s*<!--\\s*${text}\\s*\\s*-->\\s*`;
+    if (withLineDelims) {
+        regex = `^${regex}$`;
+    }
+
+    return new RegExp(regex, 'gmi');
 };
 
 export const createPattern = (text: string): RegExp => {
@@ -59,6 +68,8 @@ export const FIELDS_PATTERN = createPattern('Fields');
 
 // - Base
 export const ID_REGEX = /(?<id>\d+)/g;
+export const DATE_TIME_REGEX =
+    /(?<datetime>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/g;
 export const DECK_REGEX = /(?<deck>[a-zA-Z0-9 ]+(?:::[a-zA-Z0-9 ]+)*)/;
 
 export const TAG_REGEX = /[a-zA-Z0-9\/_-]+/;
@@ -84,10 +95,26 @@ export const createFileTagsCommentRegex = (header: string) =>
     );
 
 // - Note
-export const NOTE_ID_COMMENT_REGEX = new RegExp(
-    `\\n<!--\\s*Note id:\\s*${ID_REGEX.source}\\s*-->`,
-    'gmi'
+export const NOTE_ID_COMMENT_REGEX = createCommentRegex(
+    `Note id:\\s*${ID_REGEX.source}`,
+    false
 );
+export const NOTE_TEXT_REGEX = /(?<text>(?:.|\n)+?)/gm;
+
+export const NOTE_DATE_COMMENT_REGEX = createCommentRegex(
+    `Note (?<type>import|export) date time:\\s*${DATE_TIME_REGEX.source}`,
+    false
+);
+
+export function createIdComment(id: number) {
+    return createComment(`Note id: ${id}`);
+}
+
+export function createTimeStampComment(type: 'import' | 'export', dt?: Moment) {
+    const now = (dt ?? moment()).format('YYYY-MM-DD HH:mm:ss');
+
+    return createComment(`Note ${type} date time: ${now}`);
+}
 
 export const NOTE_DECK_COMMENT_REGEX = new RegExp(
     `\\n<!--\\s*Note deck:\\s*${DECK_REGEX.source}\\s*-->`,
@@ -130,7 +157,6 @@ export function createFieldsRegex(fields: string[]): RegExp {
 
         return createFieldRegex2(field, name).source;
     });
-    console.info('Fields patterns', patterns);
 
     return createPatternsRegex(patterns);
 }

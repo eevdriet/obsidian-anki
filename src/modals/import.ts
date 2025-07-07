@@ -23,7 +23,6 @@ import {
 } from 'settings/import';
 import { FileSuggest, FolderSuggest } from './suggest';
 import { addSection } from 'modals';
-import { valid } from 'node-html-parser';
 
 export default class ImportModal extends AnkiModal {
     name: string;
@@ -84,6 +83,8 @@ export default class ImportModal extends AnkiModal {
 
         section
             .addButton((button) => {
+                this.saveButton = button;
+
                 button
                     .setButtonText('Save')
                     .setTooltip('Save')
@@ -101,18 +102,18 @@ export default class ImportModal extends AnkiModal {
     }
 
     private displayName(contentEl: HTMLElement) {
-        let nameInput: TextComponent;
+        let nameInputEl: TextComponent;
 
         const validateRuleName = () =>
             validate(
                 () =>
                     validateName(
-                        nameInput.getValue(),
+                        nameInputEl.getValue(),
                         this.origName,
                         Object.keys(this.rules)
                     ),
                 messageEl,
-                nameInput.inputEl,
+                nameInputEl.inputEl,
                 setting.nameEl
             );
 
@@ -120,7 +121,7 @@ export default class ImportModal extends AnkiModal {
             .setName('Name')
             .setDesc('Name of the rule to apply')
             .addText((text) => {
-                nameInput = text;
+                nameInputEl = text;
 
                 const type = this.rule.noteType;
                 const placeholder =
@@ -129,9 +130,10 @@ export default class ImportModal extends AnkiModal {
                 text.setPlaceholder(placeholder)
                     .setValue(this.name)
                     .onChange((value) => {
-                        const isValid = validateRuleName();
+                        this.isValidName = validateRuleName();
+                        this.validateSaveButton();
 
-                        if (isValid) {
+                        if (this.isValidName) {
                             this.name = value;
                         }
                     });
@@ -141,7 +143,7 @@ export default class ImportModal extends AnkiModal {
             cls: 'setting-message-item',
         });
 
-        validateRuleName();
+        this.isValidName = validateRuleName();
     }
 
     private displayNoteType(contentEl: HTMLElement) {
@@ -176,6 +178,7 @@ export default class ImportModal extends AnkiModal {
                 dropdown.setValue(type);
                 dropdown.onChange((value) => {
                     this.isValidNoteType = validateType();
+                    this.validateSaveButton();
 
                     if (this.isValidNoteType) {
                         this.rule.noteType = value;
@@ -191,7 +194,7 @@ export default class ImportModal extends AnkiModal {
             cls: 'setting-message-item',
         });
 
-        validateType();
+        this.isValidNoteType = validateType();
     }
 
     private displayQuery(contentEl: HTMLElement) {
@@ -259,6 +262,7 @@ export default class ImportModal extends AnkiModal {
                 .setValue(this.rule.template)
                 .onChange((value) => {
                     this.isValidTemplate = validateFormat();
+                    this.validateSaveButton();
 
                     if (this.isValidTemplate) {
                         this.rule.template = value;
@@ -467,6 +471,7 @@ export default class ImportModal extends AnkiModal {
                     .setValue(this.rule.folder.fileFormat)
                     .onChange((value) => {
                         this.isValidFolderFileFormat = validateFileName();
+                        this.validateSaveButton();
 
                         if (this.isValidFolderFileFormat) {
                             this.rule.folder.fileFormat = value;

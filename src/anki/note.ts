@@ -1,14 +1,21 @@
 import AnkiPlugin from 'plugin';
 import {
     ANKI_PATTERN_REGEX,
+    createComment,
+    createIdComment,
+    createTimeStampComment,
     DECK_PATTERN,
     FIELDS_PATTERN,
+    NOTE_DATE_COMMENT_REGEX,
+    NOTE_END_COMMENT,
     NOTE_ID_COMMENT_REGEX,
+    NOTE_START_COMMENT,
     TAGS_PATTERN,
 } from 'regex';
 import { ExportRule } from 'settings/export';
 import { ImportRule } from 'settings/import';
 import { formatURI } from 'format';
+import { Moment } from 'moment';
 import { File } from './file';
 import { debug } from 'common';
 
@@ -30,14 +37,20 @@ export class Note {
     plugin: AnkiPlugin;
     file?: File;
 
-    id?: number;
-    type?: string;
+    // Definition of the note (without generated properties)
+    note: string = '';
+
+    // User set properties
+    noteType?: string;
     deck?: string;
     tags: string[] = [];
     cards: number[] = [];
     fields: Record<string, string> = {};
 
-    text: string = '';
+    // Generated properties
+    id?: number;
+    lastImport?: Moment;
+    lastExport?: Moment;
     status: NoteStatus = NoteStatus.UNKNOWN;
 
     constructor(plugin: AnkiPlugin, file?: File, id?: number) {
@@ -49,10 +62,9 @@ export class Note {
     static fromInfo(plugin: AnkiPlugin, info: AnkiNoteInfo): Note {
         const note = new Note(plugin);
 
-        note.setId(info.noteId);
-
         // Set normal properties
-        note.type = info.modelName;
+        note.id = info.noteId;
+        note.noteType = info.modelName;
         note.tags = info.tags;
         note.cards = info.cards;
 
@@ -78,38 +90,25 @@ export class Note {
             `<a href="${uri}" class="obsidian-link">Obsidian</a>`;
     }
 
-    setId(id: number | undefined, withComment: boolean = false): void {
-        // Set the identifier
-        this.id = id;
+    text(type?: 'import' | 'export'): string {
+        const idComment = this.id ? `\n${createIdComment(this.id)}` : '';
 
-        if (!this.file || !withComment) {
-            return;
-        }
+        const dt =
+            type === 'import'
+                ? this.lastImport
+                : type === 'export'
+                  ? this.lastExport
+                  : undefined;
+        const dtComment = type ? `\n${createTimeStampComment(type, dt)}` : '';
 
-        const noteBefore = this.text;
-        let noteAfter: string;
-
-        if (NOTE_ID_COMMENT_REGEX.test(this.text)) {
-            // Replace the ID within the comment
-            noteAfter = noteBefore.replace(
-                NOTE_ID_COMMENT_REGEX,
-                (match, oldId) => match.replace(oldId, String(this.id))
-            );
-        } else {
-            // Append the ID comment to the end of the note
-            noteAfter = `${noteBefore.trimEnd()}\n<!-- Note ID: ${this.id} -->`;
-        }
-
-        if (noteBefore != noteAfter) {
-            this.file.replace(noteBefore, noteAfter);
-        }
+        return `\n${NOTE_START_COMMENT}\n${this.note}${idComment}${dtComment}\n${NOTE_END_COMMENT}\n`;
     }
 
-    setTextFromTemplate(template: string): boolean {
-        this.text = template;
+    setFromTemplate(template: string): boolean {
+        this.note = template;
 
         // Replace individual {{Field}} patterns
-        this.text = this.text.replace(ANKI_PATTERN_REGEX, (match, key) => {
+        this.note = this.note.replace(ANKI_PATTERN_REGEX, (match, key) => {
             return key in this.fields ? this.fields[key] : match;
         });
 
@@ -118,18 +117,18 @@ export class Note {
             .map(([field, value]) => `${field}: ${value}`)
             .join('\n');
 
-        this.text = this.text.replace(FIELDS_PATTERN, fieldsStr);
+        this.note = this.note.replace(FIELDS_PATTERN, fieldsStr);
 
         // Replace {{Deck}} pattern
         if (this.deck) {
-            this.text = this.text.replace(DECK_PATTERN, this.deck);
+            this.note = this.note.replace(DECK_PATTERN, this.deck);
         }
 
         // Replace {{Tags}} pattern
         const tagsStr = this.tags.join(', ');
-        this.text = this.text.replace(TAGS_PATTERN, tagsStr);
+        this.note = this.note.replace(TAGS_PATTERN, tagsStr);
 
-        return this.text == template;
+        return this.note == template;
     }
 
     create(
@@ -137,7 +136,7 @@ export class Note {
     ): AnkiAddNote {
         return {
             deckName: this.deck!,
-            modelName: this.type!,
+            modelName: this.noteType!,
             fields: this.fields,
             tags: this.tags,
             options,

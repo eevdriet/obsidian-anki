@@ -2,6 +2,7 @@ import { Notice } from 'obsidian';
 import AnkiPlugin from 'plugin';
 import * as AnkiConnect from 'anki/connect';
 import { NoteStatus, Note } from 'anki/note';
+import { moment } from 'obsidian';
 import ExportFormatter from 'format/export';
 import NoteScanner from './scanner';
 import { errorMessage, successMessage, debug, message } from 'common';
@@ -96,22 +97,23 @@ export default class Exporter extends NoteScanner {
     }
 
     private async createNotes(notes: Note[]) {
+        debug('Create export notes (start)');
+
         // Determine which notes to add to Anki
         const notesToCreate = notes
             .filter((note) => note.status === NoteStatus.EXPORT_CREATE)
-            .filter((note) => note.deck && note.type);
-
+            .filter((note) => note.deck && note.noteType);
         if (notesToCreate.length === 0) {
             return;
         }
 
         // Format the notes to a suitable format for Anki
-        notesToCreate.forEach((note) => this.formatter.format(note));
+        const ankiNotes = notesToCreate
+            .map((note) => this.formatter.format(note))
+            .map((note) => note.create());
 
         // Determine which notes could be succesfully created
-        const identifiers = await AnkiConnect.createNotes(
-            ...notesToCreate.map((note) => note.create())
-        );
+        const identifiers = await AnkiConnect.createNotes(...ankiNotes);
 
         notesToCreate.forEach((note, idx) => {
             const id = identifiers[idx];
@@ -119,34 +121,73 @@ export default class Exporter extends NoteScanner {
                 return;
             }
 
-            note.setId(id, true);
+            // Replace the contents of the note
+            const noteBefore = note.text('export');
+
+            note.id = id;
+            note.lastExport = moment();
+
+            const noteAfter = note.text('export');
+
+            // Replace the note within the file
+            note.file?.replace(noteBefore, noteAfter);
             this.plugin.notes.add(id);
         });
 
         this.plugin.save();
-        return;
+        debug('Create export notes (end)');
     }
 
     private async updateNotes(notes: Note[]) {
-        const notesToUpdate = notes
-            .filter((note) => note.status === NoteStatus.EXPORT_UPDATE)
+        debug('Update export notes (start)');
+
+        const notesToUpdate = notes.filter(
+            (note) => note.id && note.status === NoteStatus.EXPORT_UPDATE
+        );
+        if (notesToUpdate.length === 0) {
+            return;
+        }
+
+        // Update the notes in Obsidian
+        notesToUpdate.forEach((note) => {
+            // Replace the contents of the note
+            const noteBefore = note.text('export');
+
+            note.lastExport = moment();
+
+            const noteAfter = note.text('export');
+
+            // Replace the note within the file
+            note.file?.replace(noteBefore, noteAfter);
+            this.plugin.notes.add(note.id!);
+        });
+
+        this.plugin.save();
+
+        // Update the notes in Anki
+        const ankiNotes = notesToUpdate
+            .map((note) => this.formatter.format(note))
             .map((note) => note.update());
 
-        // Modify the notes in Anki
-        await AnkiConnect.updateNotes(...notesToUpdate);
+        await AnkiConnect.updateNotes(...ankiNotes);
+        debug('Update export notes (end)');
     }
 
     private async deleteNotes(notes: Note[]) {
-        // Determine which notes to add to Anki
-        const notesToDelete = notes
-            .filter((note) => note.status === NoteStatus.EXPORT_DELETE)
-            .map((note) => note.id!);
-
-        // Delete the notes in Anki
-        const response = await AnkiConnect.deleteNotes(...notesToDelete);
+        // Find out what notes to delete
+        const notesToDelete = notes.filter(
+            (note) => note.id && note.status === NoteStatus.EXPORT_DELETE
+        );
 
         // Delete the notes in Obsidian
-        for (const file of this.files.values()) {
-        }
+        notesToDelete.forEach((note) => {
+            note.file?.replace(note.text(), '');
+            this.plugin.notes.delete(note.id!);
+        });
+
+        this.plugin.save();
+
+        // Delete the notes in Anki
+        await AnkiConnect.deleteNotes(...notesToDelete.map((note) => note.id!));
     }
 }

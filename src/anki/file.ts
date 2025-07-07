@@ -16,10 +16,13 @@ import {
     createFileTagsCommentRegex,
     NOTE_START_COMMENT,
     NOTE_END_COMMENT,
+    NOTE_DATE_COMMENT_REGEX,
+    NOTE_TEXT_REGEX,
 } from 'regex';
 import * as CryptoJS from 'crypto-js';
 import { Span, MultiSpan } from './span';
 import { ExportRule } from 'settings/export';
+import { moment } from 'obsidian';
 import { debug, TEMPLATE_FIELDS as TEMPLATE_PATTERNS } from 'common';
 import { escapeField } from 'format';
 import { ImportRule } from 'settings/import';
@@ -107,11 +110,28 @@ export class File {
         return File.hash(this.text);
     }
 
-    public replace(oldText: string, newText: string) {
-        if (!this.text.includes(oldText)) {
+    /**
+     * Replace some text in the file in a certain region
+     * @param oldText - Text to replace
+     * @param newText - Replacement
+     */
+    public replace(oldText: string | RegExp, newText: string) {
+        // Verify whether the old text is present in the file
+        let shouldReplace: boolean = true;
+
+        if (typeof oldText === 'string') {
+            shouldReplace = this.text.indexOf(oldText) != -1;
+        } else {
+            shouldReplace = (oldText as RegExp).test(this.text);
+        }
+
+        // Text is not present; no replacement
+        if (!shouldReplace) {
+            console.info('No replacy', typeof oldText, this);
             return;
         }
 
+        // Perform replacement
         this.text = this.text.replace(oldText, newText);
         this.status = FileStatus.MODIFIED;
     }
@@ -126,14 +146,18 @@ export class File {
 
     public findImportNotes(rule: ImportRule): Note[] {
         const regex = new RegExp(
-            `^${NOTE_START_COMMENT}\\n(?<text>(?:.|\\n)+?)${NOTE_ID_COMMENT_REGEX.source}\\n?${NOTE_END_COMMENT}`,
+            `^${NOTE_START_COMMENT}\\n${NOTE_TEXT_REGEX.source}${NOTE_ID_COMMENT_REGEX.source}\\n?${NOTE_DATE_COMMENT_REGEX.source}\\n?${NOTE_END_COMMENT}`,
             'gmi'
         );
+
         return this.matchAll(regex).map((match) => {
-            const { id, text } = match.groups!;
+            const { id, text, datetime } = match.groups!;
 
             const note = new Note(this.plugin, this, Number(id));
-            note.text = text;
+            note.note = text;
+            note.lastImport = moment(datetime, 'YYYY-MM-DD HH:mm:ss');
+
+            console.info(id, 'Groups', match.groups, note.clone());
 
             return note;
         });
@@ -171,8 +195,8 @@ export class File {
             }
 
             // Set properties
-            note.type = rule.noteType;
-            note.text = match.result[0];
+            note.noteType = rule.noteType;
+            note.note = match.result[0];
 
             note.fields = match.fields;
             note.deck =
