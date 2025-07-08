@@ -90,9 +90,11 @@ export class Note {
     }
 
     text(type?: 'import' | 'export'): string {
-        const beginComment = type !== 'import' ? '' : `${NOTE_START_COMMENT}\n`;
+        const beginComment = type !== 'import' ? '' : `${NOTE_START_COMMENT}`;
+        const endComment = type !== 'import' ? '' : NOTE_END_COMMENT;
+
         const idComment = this.id
-            ? `\n${createComment(`Note identifier: ${this.id}`)}`
+            ? `${createComment(`Note identifier: ${this.id}`)}`
             : '';
 
         const dt =
@@ -101,12 +103,12 @@ export class Note {
                 : type === 'export'
                   ? this.lastExport
                   : undefined;
-        const dtComment =
-            type && dt ? `\n${createTimeStampComment(type, dt)}` : '';
+        const dtComment = type && dt ? createTimeStampComment(type, dt) : '';
 
-        const endComment = type !== 'import' ? '' : `\n${NOTE_END_COMMENT}\n`;
-
-        return `\n${beginComment}${this.note}${idComment}${dtComment}${endComment}`;
+        return `${beginComment}\n${this.note}\n${idComment}\n${dtComment}\n${endComment}`.replace(
+            '\n\n',
+            '\n'
+        );
     }
 
     setFromTemplate(template: string): boolean {

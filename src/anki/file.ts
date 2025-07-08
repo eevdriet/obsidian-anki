@@ -137,9 +137,9 @@ export class File {
 
         // Text is not present; no replacement
         if (!shouldReplace) {
-            // console.info('No replacy', typeof oldText, this);
-            // console.info('OLD', oldText);
-            // console.info('NEW', newText);
+            console.info('No replacy', typeof oldText, this);
+            console.info('OLD', oldText);
+            console.info('NEW', newText);
             return;
         }
 
@@ -211,8 +211,8 @@ export class File {
             // Set properties
             note.note = match.note;
             note.fields = match.fields;
-
             note.noteType = rule.noteType;
+
             note.deck =
                 match.deck ?? this.findMatch(pos, this.decks) ?? rule.deck;
 
@@ -350,7 +350,6 @@ export class File {
                 })
                 .map((match) => {
                     const groups = match.slice(2, -1);
-                    console.info('Groups', groups);
 
                     // Set fields based on the (non-named) capture groups
                     const fields: Record<string, string> = {};
