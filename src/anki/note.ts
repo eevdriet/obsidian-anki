@@ -81,9 +81,9 @@ export class Note {
         return note;
     }
 
-    setLink(path: string, field: string) {
+    setLink(path: string, field: string, line?: number) {
         const vault = this.plugin.app.vault.getName();
-        const uri = formatURI(vault, path);
+        const uri = formatURI(vault, path, line);
 
         this.fields[field] =
             `<a href="${uri}" class="obsidian-link">Obsidian</a>`;

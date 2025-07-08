@@ -196,7 +196,9 @@ export class File {
             const span = Span.fromMatch(match.result);
             this.searched.merge(span);
 
+            // Determine where in the file the match occurs
             const pos = match.result.index!;
+            const line = this.text.slice(0, pos).split('\n').length;
 
             // Retrieve the note from cache or create a new one
             const id = match.id ? parseInt(match.id) : undefined;
@@ -229,7 +231,7 @@ export class File {
 
             // Link to obsidian
             if (rule.link.enabled && rule.link.field) {
-                note.setLink(this.tfile.path, rule.link.field);
+                note.setLink(this.tfile.path, rule.link.field, line);
             }
 
             note.status = note.id

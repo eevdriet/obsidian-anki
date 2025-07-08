@@ -142,9 +142,10 @@ export function formatTemplate(template: string, note: Note): string {
     });
 }
 
-export function formatURI(vault: string, file: string) {
+export function formatURI(vault: string, file: string, line?: number) {
     const vaultURI = encodeURIComponent(vault);
     const fileURI = encodeURIComponent(file);
+    const lineURI = line ? `&line=${line}` : '';
 
-    return `obsidian://open?vault=${vaultURI}&file=${fileURI}`;
+    return `obsidian://open?vault=${vaultURI}&file=${fileURI}${lineURI}`;
 }
