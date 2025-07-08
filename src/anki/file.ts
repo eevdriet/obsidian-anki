@@ -3,7 +3,7 @@ import { Note, NoteStatus } from './note';
 import AnkiPlugin from 'plugin';
 import {
     ANKI_PATTERN_REGEX,
-    createFieldRegex,
+    createFieldValueRegex,
     createFieldsRegex,
     LIST_SEP_REGEX,
     ID_REGEX,
@@ -41,7 +41,7 @@ export enum FileStatus {
     MODIFIED,
 }
 
-const EXPORT_PATTERNS: [keyof MatchResult, RegExp][] = [
+const EXPORT_PROPERTY_PATTERNS: [keyof MatchResult, RegExp][] = [
     ['id', NOTE_ID_COMMENT_REGEX],
     ['datetime', NOTE_DATE_COMMENT_REGEX],
     ['deck', NOTE_DECK_COMMENT_REGEX],
@@ -126,6 +126,9 @@ export class File {
      * @param newText - Replacement
      */
     public replace(oldText: string | RegExp, newText: string) {
+        console.info('Note before', oldText);
+        console.info('Note after', newText);
+
         // Verify whether the old text is present in the file
         let shouldReplace: boolean = true;
 
@@ -254,27 +257,27 @@ export class File {
 
     private matchTemplate(rule: ExportRule): MatchResult[] {
         let template = String(rule.template.format);
-
         const allFields = this.plugin.fields[rule.noteType] ?? [];
 
         for (const match of rule.template.format.matchAll(ANKI_PATTERN_REGEX)) {
             // Define actions after matching the template and the pattern replacement
-            const pattern = match[1];
+            const [pattern, type] = match.slice(0, 2);
+            // console.info('Match', pattern, type, match);
             let replacement: string;
 
             // Try to set all fields at once
-            if (pattern === 'Fields') {
+            if (type === 'Fields') {
                 replacement = createFieldsRegex(allFields).source;
             }
 
             // Try to set a single field
-            else if (allFields.includes(pattern)) {
-                replacement = createFieldRegex(pattern).source;
+            else if (allFields.includes(type)) {
+                replacement = createFieldValueRegex(type).source;
             }
 
             // Try to set a special property, such as "Cards" or "Tags"
-            else if (TEMPLATE_PATTERNS.includes(pattern)) {
-                replacement = TEMPLATE_PATTERN_REGEXES[pattern].source;
+            else if (TEMPLATE_PATTERNS.includes(type)) {
+                replacement = TEMPLATE_PATTERN_REGEXES[type].source;
             }
 
             // ERROR: shouldn't happen
@@ -285,46 +288,52 @@ export class File {
                 continue;
             }
 
-            template = template.replace(pattern, replacement);
+            template = template
+                .replace(pattern, replacement)
+                .trim()
+                .replace('\n\n', '\n');
         }
 
         const regex = new RegExp(
-            `(?<_note>${template})(?<props>(?:\\n^\\s*<!--\\s.*-->\\s*$)*)`,
-            'gm'
+            `(?<_note>${template})(?<props>(?:\\n?^\\s*<!--\\s.*-->\\s*$)*)`,
+            'gim'
         );
-        // console.info('Regex (Template)', regex.source);
+        console.info('Regex (template)', regex.source);
 
-        return this.matchAll(regex)
-            .filter((match) => {
-                /*
-                     2: ignore full match and <note> group
-                    -1: ignore <props> group
-                */
-                const groups = match.slice(2, -1);
-                return groups.some((group) => group !== undefined);
-            })
-            .map((match) => {
-                // Set fields
-                const fields: Record<string, string> = {};
-                for (const field of allFields) {
-                    const capture = escapeField(field);
-                    fields[field] = match.groups![capture];
+        return this.matchAll(regex).map((match) => {
+            const {
+                _note: note,
+                _fields,
+                props,
+                deck,
+                tags,
+                ...rest
+            } = match.groups!;
+
+            // Set fields from {{Fields}} pattern
+            const fields: Record<string, string> = this.extractFields(
+                _fields,
+                allFields
+            );
+
+            // Set fields from individual {{...}} patterns
+            for (const [field, value] of Object.entries(rest)) {
+                if (allFields.includes(field)) {
+                    fields[field] = value;
                 }
+            }
 
-                // Set properties from HTML comments based on the (named) groups
-                const { _note: note, props } = match.groups!;
+            // Set properties from HTML comments based on the (named) groups
+            let result: MatchResult = {
+                result: match,
+                fields,
+                note,
+                deck,
+                tags,
+            };
 
-                let result: MatchResult = { result: match, fields, note };
-
-                for (const [_, regex] of EXPORT_PATTERNS) {
-                    const match = props.match(regex);
-                    if (match && match.groups) {
-                        (result as any) = { ...result, ...match.groups };
-                    }
-                }
-
-                return result;
-            });
+            return { ...result, ...this.extractProps(props) };
+        });
     }
 
     private matchRegex(rule: ExportRule): MatchResult[] {
@@ -377,15 +386,7 @@ export class File {
                     const { note, props } = match.groups!;
                     let result: MatchResult = { result: match, fields, note };
 
-                    // Set properties from HTML comments based on the (named) capture groups
-                    for (const [_, regex] of EXPORT_PATTERNS) {
-                        const match = props.match(regex);
-                        if (match && match.groups) {
-                            (result as any) = { ...result, ...match.groups };
-                        }
-                    }
-
-                    return result;
+                    return { ...result, ...this.extractProps(props) };
                 })
         );
     }
@@ -415,5 +416,47 @@ export class File {
         }
 
         return undefined;
+    }
+
+    private extractFields(
+        text: string,
+        fields: string[]
+    ): Record<string, string> {
+        const result: Record<string, string> = {};
+        const fieldRegex = new RegExp(
+            `(?<field>^(?:${fields.map(escapeField).join('|')}))\\s*:\\s*`,
+            'gm'
+        );
+
+        const matches = [...text.matchAll(fieldRegex)];
+        let lastStart: number = 0;
+
+        for (let idx = matches.length - 1; idx >= 0; idx--) {
+            const match = matches[idx];
+            const { field } = match.groups!;
+
+            // Field value is all text from the start to the start of the next field
+            const start = match.index! + match[0].length;
+            const end = idx === matches.length - 1 ? undefined : lastStart;
+            result[field] = text.slice(start, end).trim();
+
+            lastStart = match.index!;
+        }
+
+        return result;
+    }
+
+    private extractProps(props: string): MatchResult {
+        let result = {};
+
+        // Set properties from HTML comments based on the (named) capture groups
+        for (const [_, regex] of EXPORT_PROPERTY_PATTERNS) {
+            const match = props.match(regex);
+            if (match && match.groups) {
+                result = { ...result, ...match.groups };
+            }
+        }
+
+        return result as MatchResult;
     }
 }

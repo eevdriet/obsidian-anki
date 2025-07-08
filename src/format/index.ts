@@ -102,7 +102,7 @@ export function escapeHTML(html: string): string {
 }
 
 export function escapeField(field: string): string {
-    return escapeRegex(field.toLowerCase().replace(/\s+/, '_'));
+    return escapeRegex(field.replace(/\s+/, '_'));
 }
 
 export function formatTemplate(template: string, note: Note): string {

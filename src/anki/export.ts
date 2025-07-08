@@ -136,8 +136,6 @@ export default class Exporter extends NoteScanner {
 
             // Replace the note within the file
             note.file?.replace(noteBefore, noteAfter);
-            console.debug('Note before', noteBefore);
-            console.debug('Note after', noteAfter);
             this.plugin.notes.add(id);
         });
 

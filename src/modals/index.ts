@@ -116,9 +116,9 @@ export function validateTemplate(
         return [false, 'error', message];
     }
 
-    // No two patterns only separated by whitespace on the same line
+    // No two patterns only separated by whitespace
     const twoPatternRegex = new RegExp(
-        `${ANKI_PATTERN_REGEX.source}[ \\t]*${ANKI_PATTERN_REGEX.source}`,
+        `${ANKI_PATTERN_REGEX.source}[ \\n\\t]*${ANKI_PATTERN_REGEX.source}`,
         'm'
     );
     if ((template.match(twoPatternRegex) ?? []).length > 0) {

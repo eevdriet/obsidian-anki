@@ -105,10 +105,9 @@ export class Note {
                   : undefined;
         const dtComment = type && dt ? createTimeStampComment(type, dt) : '';
 
-        return `${beginComment}\n${this.note}\n${idComment}\n${dtComment}\n${endComment}`.replace(
-            '\n\n',
-            '\n'
-        );
+        return `${beginComment}\n${this.note}\n${idComment}\n${dtComment}\n${endComment}`
+            .replace('\n\n', '\n')
+            .trimEnd();
     }
 
     setFromTemplate(template: string): boolean {

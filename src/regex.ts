@@ -127,16 +127,15 @@ export const NOTE_TAGS_COMMENT_REGEX = new RegExp(
 );
 
 // - Fields
-// export const FIELD_REGEX = /[a-zA-Z0-9 _-]+/;
 export const FIELD_REGEX = /.+/;
-export const FIELD_VALUE_REGEX = /.+/;
 
-export function createFieldRegex(field: string): RegExp {
-    const result = new RegExp(
-        `${FIELD_REGEX.source}\\s*:\\s*(?<${field}>${FIELD_VALUE_REGEX.source})`
-    );
+/**
+ A field value can be any text that is not broken up by 2 newlines
+ */
+export const FIELD_VALUE_REGEX = /(?:(?!\n\n)(?!<!-- Note)[\s\S])*/;
 
-    return result;
+export function createFieldValueRegex(field: string): RegExp {
+    return new RegExp(`(?<${field}>${FIELD_VALUE_REGEX.source})`);
 }
 
 export function createFieldRegex2(field: string, group?: string): RegExp {
@@ -148,14 +147,10 @@ export function createFieldRegex2(field: string, group?: string): RegExp {
 }
 
 export function createFieldsRegex(fields: string[]): RegExp {
-    const patterns = fields.map((field, idx) => {
-        field = escapeRegex(field);
-        const name = `field${idx}`;
+    const fieldOpts = `(?:${fields.map(escapeField).join('|')})`;
+    const fieldRegex = `(?:${fieldOpts}\\s*:\\s*${FIELD_VALUE_REGEX.source})`;
 
-        return createFieldRegex2(field, name).source;
-    });
-
-    return createPatternsRegex(patterns);
+    return new RegExp(`(?<_fields>${fieldRegex}(?:\\n${fieldRegex})*)`, 'gm');
 }
 
 export const TEMPLATE_PATTERN_REGEXES: Record<string, RegExp> = {

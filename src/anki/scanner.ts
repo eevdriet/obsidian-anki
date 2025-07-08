@@ -29,7 +29,6 @@ export default class NoteScanner {
         this.notesWithoutId = [];
 
         const allFiles = this.findVaultNoteFiles();
-        debug('All files', allFiles);
         const processed = new Set();
 
         for (const [tfiles, rule] of allFiles) {
@@ -84,6 +83,7 @@ export default class NoteScanner {
             }
         }
 
+        debug(this.ruleFiles);
         debug('Scan vault (end)');
         this.plugin.save();
     }
