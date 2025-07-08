@@ -51,7 +51,7 @@ export const createCommentRegex = (
         regex = `^${regex}$`;
     }
 
-    return new RegExp(regex, 'gmi');
+    return new RegExp(regex, 'im');
 };
 
 export const createPattern = (text: string): RegExp => {
@@ -88,6 +88,7 @@ export const createFileDeckCommentRegex = (header: string) =>
         `^\\s*<!--\\s*${header}:\\s*${DECK_REGEX.source}\\s*-->\\s*$`,
         'gm'
     );
+
 export const createFileTagsCommentRegex = (header: string) =>
     new RegExp(
         `^\\s*<!--\\s*${header}:\\s*${TAGS_REGEX.source}\\s*-->\\s*$`,
@@ -96,7 +97,7 @@ export const createFileTagsCommentRegex = (header: string) =>
 
 // - Note
 export const NOTE_ID_COMMENT_REGEX = createCommentRegex(
-    `Note id:\\s*${ID_REGEX.source}`,
+    `Note id(?:entifier)?:\\s*${ID_REGEX.source}`,
     false
 );
 export const NOTE_TEXT_REGEX = /(?<text>(?:.|\n)+?)/gm;
@@ -105,10 +106,6 @@ export const NOTE_DATE_COMMENT_REGEX = createCommentRegex(
     `Note (?<type>import|export) date time:\\s*${DATE_TIME_REGEX.source}`,
     false
 );
-
-export function createIdComment(id: number) {
-    return createComment(`Note id: ${id}`);
-}
 
 export function createTimeStampComment(type: 'import' | 'export', dt?: Moment) {
     const now = (dt ?? moment()).format('YYYY-MM-DD HH:mm:ss');

@@ -41,11 +41,21 @@ export enum FileStatus {
     MODIFIED,
 }
 
+const EXPORT_PATTERNS: [keyof MatchResult, RegExp][] = [
+    ['id', NOTE_ID_COMMENT_REGEX],
+    ['datetime', NOTE_DATE_COMMENT_REGEX],
+    ['deck', NOTE_DECK_COMMENT_REGEX],
+    ['tags', NOTE_TAGS_COMMENT_REGEX],
+    ['cards', NOTE_CARDS_COMMENT_REGEX],
+];
+
 export type MatchResult = {
     result: RegExpMatchArray;
+    note: string;
     fields: Record<string, string>;
 
     id?: string;
+    datetime?: string;
     deck?: string;
     cards?: string;
     tags?: string;
@@ -127,7 +137,9 @@ export class File {
 
         // Text is not present; no replacement
         if (!shouldReplace) {
-            console.info('No replacy', typeof oldText, this);
+            // console.info('No replacy', typeof oldText, this);
+            // console.info('OLD', oldText);
+            // console.info('NEW', newText);
             return;
         }
 
@@ -195,17 +207,27 @@ export class File {
             }
 
             // Set properties
-            note.noteType = rule.noteType;
-            note.note = match.result[0];
-
+            note.note = match.note;
             note.fields = match.fields;
+
+            note.noteType = rule.noteType;
             note.deck =
                 match.deck ?? this.findMatch(pos, this.decks) ?? rule.deck;
 
+            note.lastExport = match.datetime
+                ? moment(match.datetime)
+                : undefined;
+
+            // Tags (both from rule and from file)
             note.tags = (match.tags ?? this.findMatch(pos, this.tags) ?? '')
                 .split(LIST_SEP_REGEX)
                 .map((tag) => tag.trim());
 
+            if (rule.tag.enabled && !note.tags.includes(rule.tag.format)) {
+                note.tags = [...note.tags, rule.tag.format];
+            }
+
+            // Link to obsidian
             if (rule.link.enabled && rule.link.field) {
                 note.setLink(this.tfile.path, rule.link.field);
             }
@@ -264,90 +286,107 @@ export class File {
             template = template.replace(pattern, replacement);
         }
 
-        const regex = new RegExp(`${template}(?:\n?${ID_REGEX.source})?`, 'gm');
-        // console.debug('Regex (Template)', regex.source);
+        const regex = new RegExp(
+            `(?<_note>${template})(?<props>(?:\\n^\\s*<!--\\s.*-->\\s*$)*)`,
+            'gm'
+        );
+        // console.info('Regex (Template)', regex.source);
 
-        return this.matchAll(regex).map((match) => {
-            //
-            const fields: Record<string, string> = {};
-            for (const field of allFields) {
-                const capture = escapeField(field);
-                fields[field] = match.groups![capture];
-            }
+        return this.matchAll(regex)
+            .filter((match) => {
+                /*
+                     2: ignore full match and <note> group
+                    -1: ignore <props> group
+                */
+                const groups = match.slice(2, -1);
+                return groups.some((group) => group !== undefined);
+            })
+            .map((match) => {
+                // Set fields
+                const fields: Record<string, string> = {};
+                for (const field of allFields) {
+                    const capture = escapeField(field);
+                    fields[field] = match.groups![capture];
+                }
 
-            const { id, deck, cards, tags } = match.groups!;
-            return {
-                result: match,
-                fields,
-                deck,
-                id,
-                cards,
-                tags,
-            };
-        });
+                // Set properties from HTML comments based on the (named) groups
+                const { _note: note, props } = match.groups!;
+
+                let result: MatchResult = { result: match, fields, note };
+
+                for (const [_, regex] of EXPORT_PATTERNS) {
+                    const match = props.match(regex);
+                    if (match && match.groups) {
+                        (result as any) = { ...result, ...match.groups };
+                    }
+                }
+
+                return result;
+            });
     }
 
     private matchRegex(rule: ExportRule): MatchResult[] {
-        const patterns = [
-            NOTE_ID_COMMENT_REGEX.source,
-            NOTE_DECK_COMMENT_REGEX.source,
-            NOTE_TAGS_COMMENT_REGEX.source,
-            NOTE_CARDS_COMMENT_REGEX.source,
-        ];
-
+        // Match against the rule's regex and optionally some properties set in HTML comment
         const regex = new RegExp(
-            `^${rule.regex.format}(?:${patterns.join('|')})*`,
+            `(?<note>${rule.regex.format})(?<props>(?:\\n^\\s*<!--\\s.*-->\\s*$)*)`,
             'gm'
         );
 
         const allFields = this.plugin.fields[rule.noteType] ?? [];
 
-        const result = this.matchAll(regex)
-            // Only keep notes that have at least a single capture group set
-            .filter((match) => {
-                const groups = match.slice(1, -patterns.length);
+        return (
+            this.matchAll(regex)
+                // Only keep notes that have at least a single capture group set
+                .filter((match) => {
+                    /*
+                         2: ignore full match and <note> group
+                        -1: ignore <props> group
+                    */
+                    const groups = match.slice(2, -1);
 
-                return groups.some((group) => group !== undefined);
-            })
-            .map((match) => {
-                const groups = match.slice(1, -patterns.length);
+                    return groups.some((group) => group !== undefined);
+                })
+                .map((match) => {
+                    const groups = match.slice(2, -1);
+                    console.info('Groups', groups);
 
-                // Construct fields
-                const fields: Record<string, string> = {};
+                    // Set fields based on the (non-named) capture groups
+                    const fields: Record<string, string> = {};
 
-                for (let idx = 0; idx < allFields.length; idx++) {
-                    // Read the fields in order or from manually set captures
-                    let field = allFields[idx];
-                    if (idx in rule.regex.captures) {
-                        field = rule.regex.captures[idx];
+                    for (let idx = 0; idx < allFields.length; idx++) {
+                        // Read the fields in order or from manually set captures
+                        let field = allFields[idx];
+                        if (idx in rule.regex.captures) {
+                            field = rule.regex.captures[idx];
+                        }
+
+                        let group = groups.at(idx);
+
+                        // Override field if the capture is empty
+                        if (rule.shouldOverride && group === undefined) {
+                            group = '';
+                        }
+
+                        // Set the field to its captured value if anything was captured (or overridden)
+                        if (group !== undefined) {
+                            fields[field] = group;
+                        }
                     }
 
-                    let group = groups.at(idx);
+                    const { note, props } = match.groups!;
+                    let result: MatchResult = { result: match, fields, note };
 
-                    // Override field if the capture is empty
-                    if (rule.shouldOverride && group === undefined) {
-                        group = '';
+                    // Set properties from HTML comments based on the (named) capture groups
+                    for (const [_, regex] of EXPORT_PATTERNS) {
+                        const match = props.match(regex);
+                        if (match && match.groups) {
+                            (result as any) = { ...result, ...match.groups };
+                        }
                     }
 
-                    // Set the field to its captured value if anything was captured (or overridden)
-                    if (group !== undefined) {
-                        fields[field] = group;
-                    }
-                }
-
-                const { id, deck, cards, tags } = match.groups!;
-
-                return {
-                    result: match,
-                    fields,
-                    deck,
-                    id,
-                    cards,
-                    tags,
-                };
-            });
-
-        return result;
+                    return result;
+                })
+        );
     }
 
     private matchAll(regex: RegExp) {

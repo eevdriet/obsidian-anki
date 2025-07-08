@@ -19,7 +19,7 @@ import { DEFAULT_EXPORT_RULE, ExportType, ExportRule } from 'settings/export';
 import { addSection } from 'modals';
 import { FolderSuggest, TextSuggest } from './suggest';
 import { countCaptureGroups } from 'regex';
-import { message } from 'common';
+import { message, PLUGIN } from 'common';
 import { areEqual } from 'utils';
 
 export default class ExportModal extends AnkiModal {
@@ -66,6 +66,7 @@ export default class ExportModal extends AnkiModal {
 
         this.addExportFormat(contentEl);
         this.displayFields(contentEl);
+        this.displayTags(contentEl);
         this.displayFiles(contentEl);
 
         this.validateSaveButton();
@@ -639,6 +640,33 @@ export default class ExportModal extends AnkiModal {
                         this.rule.link.enabled = value;
                     });
             });
+    }
+
+    private displayTags(contentEl: HTMLElement) {
+        // Tag settings
+        const section = addSection(
+            contentEl,
+            'Tags',
+            `Whether to add a tag to exported flashcards to signify the notes are created with ${PLUGIN}`,
+            'tag'
+        );
+
+        section
+            .addToggle((toggle) => {
+                toggle.setValue(this.rule.tag.enabled).onChange((value) => {
+                    this.rule.tag.enabled = value;
+                });
+            })
+            .addText((text) => {
+                text.setPlaceholder(DEFAULT_EXPORT_RULE.tag.format)
+                    .setValue(this.rule.tag.format)
+                    .onChange((value) => {
+                        this.rule.tag.format = value;
+                    });
+            })
+            .addExtraButton((button) =>
+                setupWikiButton(button, 'Exporting#tags')
+            );
     }
 
     private displayFiles(contentEl: HTMLElement) {

@@ -25,6 +25,12 @@ export type ExportRule = {
     // Which deck to export the notes into
     deck: string;
 
+    tag: {
+        enabled: boolean;
+
+        format: string;
+    };
+
     source: {
         // Path of the folder to search in for export notes
         folder: string;
@@ -66,6 +72,11 @@ export const DEFAULT_EXPORT_RULE: ExportRule = Object.freeze({
     source: {
         folder: '/',
         patterns: [],
+    },
+
+    tag: {
+        enabled: false,
+        format: 'obsidian',
     },
 
     shouldOverride: false,

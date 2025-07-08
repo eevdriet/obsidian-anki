@@ -1,4 +1,3 @@
-import { Notice } from 'obsidian';
 import AnkiPlugin from 'plugin';
 import * as AnkiConnect from 'anki/connect';
 import { NoteStatus, Note } from 'anki/note';
@@ -64,9 +63,15 @@ export default class Exporter extends NoteScanner {
             name = `export-${name}`;
 
             const files = this.ruleFiles.get(name) ?? [];
+            debug('Rule', name, rule, files);
+
             for (const file of files) {
                 // Find all notes from the current file
                 const notes = file.findExportNotes(rule);
+
+                if (notes.length > 0) {
+                    debug(file.tfile.name, notes);
+                }
 
                 for (const note of notes) {
                     if (note.id) {
@@ -131,6 +136,8 @@ export default class Exporter extends NoteScanner {
 
             // Replace the note within the file
             note.file?.replace(noteBefore, noteAfter);
+            console.debug('Note before', noteBefore);
+            console.debug('Note after', noteAfter);
             this.plugin.notes.add(id);
         });
 

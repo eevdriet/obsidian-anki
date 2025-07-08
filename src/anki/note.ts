@@ -2,7 +2,6 @@ import AnkiPlugin from 'plugin';
 import {
     ANKI_PATTERN_REGEX,
     createComment,
-    createIdComment,
     createTimeStampComment,
     DECK_PATTERN,
     FIELDS_PATTERN,
@@ -91,7 +90,10 @@ export class Note {
     }
 
     text(type?: 'import' | 'export'): string {
-        const idComment = this.id ? `\n${createIdComment(this.id)}` : '';
+        const beginComment = type !== 'import' ? '' : `${NOTE_START_COMMENT}\n`;
+        const idComment = this.id
+            ? `\n${createComment(`Note identifier: ${this.id}`)}`
+            : '';
 
         const dt =
             type === 'import'
@@ -99,9 +101,12 @@ export class Note {
                 : type === 'export'
                   ? this.lastExport
                   : undefined;
-        const dtComment = type ? `\n${createTimeStampComment(type, dt)}` : '';
+        const dtComment =
+            type && dt ? `\n${createTimeStampComment(type, dt)}` : '';
 
-        return `\n${NOTE_START_COMMENT}\n${this.note}${idComment}${dtComment}\n${NOTE_END_COMMENT}\n`;
+        const endComment = type !== 'import' ? '' : `\n${NOTE_END_COMMENT}\n`;
+
+        return `\n${beginComment}${this.note}${idComment}${dtComment}${endComment}`;
     }
 
     setFromTemplate(template: string): boolean {

@@ -86,7 +86,7 @@ export default class ExportFormatter extends Formatter {
             );
         }
 
-        if (markdown != result) {
+        if (false && markdown != result) {
             console.info(`Result (pre -> post)
 ${markdown}
 <--->

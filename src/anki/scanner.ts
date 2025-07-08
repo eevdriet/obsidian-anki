@@ -29,15 +29,13 @@ export default class NoteScanner {
         this.notesWithoutId = [];
 
         const allFiles = this.findVaultNoteFiles();
+        debug('All files', allFiles);
         const processed = new Set();
 
         for (const [tfiles, rule] of allFiles) {
             for (const tfile of tfiles) {
                 // Skip the file if it has already been processed
                 const path = tfile.path;
-                if (processed.has(path)) {
-                    continue;
-                }
 
                 // Create file if it doesn't exist already
                 let file = this.files.get(path);
@@ -56,6 +54,10 @@ export default class NoteScanner {
                         ...(this.ruleFiles.get(rule) ?? []),
                         file,
                     ]);
+                }
+
+                if (processed.has(path)) {
+                    continue;
                 }
 
                 processed.add(path);
@@ -87,13 +89,18 @@ export default class NoteScanner {
     }
 
     protected async writeFiles(): Promise<void> {
+        debug('Write files (start)');
+
         const modifiedFiles = Array.from(this.files.values()).filter(
             (file) => file.status === FileStatus.MODIFIED
         );
+        debug('Modified', this.files, modifiedFiles);
 
         for (const file of modifiedFiles) {
             await this.app.vault.modify(file.tfile, file.text);
         }
+
+        debug('Write files (end)');
     }
 
     private findFilesFromSource(
@@ -172,6 +179,10 @@ export default class NoteScanner {
         for (const [name, rule] of Object.entries(
             this.plugin.settings.import.rules
         )) {
+            if (!rule.enabled) {
+                continue;
+            }
+
             let files: TFile[] = [];
 
             if (rule.type === 'file') {
@@ -185,6 +196,10 @@ export default class NoteScanner {
         for (const [name, rule] of Object.entries(
             this.plugin.settings.export.rules
         )) {
+            if (!rule.enabled) {
+                continue;
+            }
+
             let { folder, patterns } = rule.source;
             folder = folder === '' ? '/' : folder;
 
