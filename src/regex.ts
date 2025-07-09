@@ -37,6 +37,11 @@ export const ANKI_PATTERN_REGEX = /\{\{([^:"{}]*)\}\}/g;
 export const ANKI_CLOZE_REGEX =
     /\{\{c(?<cloze_number>\d+)::(?<cloze_value>.+?)\}\}/gm;
 
+export const ANKI_IMAGE_REGEX = /<img.*src="(?<img>.+)".*\/?>/gm;
+export const ANKI_AUDIO_REGEX = /\[sound:(?<audio>.+)\]/gm;
+export const ANKI_VIDEO_REGEX =
+    /<video>.*<source.*src="(?<video>.+)".*<\/video>/gm;
+
 // Note
 // - Patterns
 export const createComment = (text: string): string => {

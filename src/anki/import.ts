@@ -7,13 +7,6 @@ import { Note, NoteStatus } from './note';
 import { escapeFileName, formatTemplate } from 'format';
 import NoteScanner from './scanner';
 import { ImportRule } from 'settings/import';
-import {
-    NOTE_START_COMMENT,
-    NOTE_END_COMMENT,
-    createComment,
-    NOTE_DATE_COMMENT_REGEX,
-    createTimeStampComment,
-} from 'regex';
 import { debug, errorMessage, message, successMessage } from 'common';
 import { CardInfo } from './card';
 
@@ -26,34 +19,39 @@ export default class Importer extends NoteScanner {
 
     constructor(plugin: AnkiPlugin) {
         super(plugin);
-        this.formatter = new ImportFormatter(this.vault);
+        this.formatter = new ImportFormatter(this.app);
     }
 
     public async import(): Promise<void> {
         message('Importing...');
 
-        try {
-            // Determine which notes can be imported to Anki
-            await this.scanVault();
-            await this.findImportNotes();
+        // Determine which notes can be imported to Anki
+        await this.scanVault();
+        await this.findImportNotes();
 
-            const allNotes = [...this.ankiNotes.values()].map((note) =>
-                this.formatter.format(note)
-            );
-            if (allNotes.length === 0) {
-                debug('No notes imported from Anki');
-                return;
-            }
+        const allNotes = [...this.ankiNotes.values()];
+        if (allNotes.length === 0) {
+            debug('No notes imported from Anki');
+            return;
+        }
+
+        // Format the notes to a suitable format for Obsidian and retrieve media
+        const formattedNotes = [];
+        for (const note of allNotes) {
+            const formatted = await this.formatter.format(note);
+            formattedNotes.push(formatted);
+        }
+        const media = this.formatter.media;
+
+        console.info('Formatted notes', formattedNotes);
+
+        try {
+            // Perform Anki actions
+            await this.retrieveMedia(media);
 
             // Perform Obsidian actions
-            debug('Create import notes (start)');
-            await this.createNotes(allNotes);
-            debug('Create import notes (end)');
-
-            debug('Update import notes (start)');
-            await this.updateNotes(allNotes);
-            debug('Update import notes (end)');
-
+            await this.createNotes(formattedNotes);
+            await this.updateNotes(formattedNotes);
             await this.writeFiles();
 
             successMessage('Import');
@@ -94,8 +92,6 @@ export default class Importer extends NoteScanner {
             if (rule.type === 'file') {
                 ruleFile = await this.findFile(rule.file.path, rule);
                 const notes = ruleFile.findImportNotes(rule);
-
-                console.info('File', ruleFile.tfile.name, notes);
 
                 for (const note of notes) {
                     if (note.id) {
@@ -176,7 +172,6 @@ export default class Importer extends NoteScanner {
         }
 
         debug('Find import notes (end)');
-        debug('Notes', this.ankiNotes, this.notesWithId);
     }
 
     private async findImportCards() {
@@ -192,6 +187,29 @@ export default class Importer extends NoteScanner {
         }
     }
 
+    private async retrieveMedia(media: Map<string, string>) {
+        // Determine which media files should be retrieved and split paths
+        const filteredMedia = [...media.entries()].filter(
+            ([_, path]) => !this.app.vault.getAbstractFileByPath(path)
+        );
+
+        const mediaPaths = filteredMedia.map(([media, _]) => media);
+        const attachPaths = filteredMedia.map(([_, attach]) => attach);
+
+        // Retrieve the media contents from Anki
+        const contents = await AnkiConnect.retrieveMedia(...mediaPaths);
+
+        for (let idx = 0; idx < filteredMedia.length; idx++) {
+            // Determine Obsidian media path and contents
+            const path = attachPaths[idx];
+            const content = contents[idx];
+
+            // Write the media into the vault
+            const buffer = Buffer.from(content, 'base64');
+            await this.app.vault.createBinary(path, buffer);
+        }
+    }
+
     private async createNotes(ankiNotes: Note[]) {
         // Determine which notes to add to Obsidian
         const notesToCreate = ankiNotes.filter(
@@ -200,6 +218,8 @@ export default class Importer extends NoteScanner {
         if (notesToCreate.length === 0) {
             return;
         }
+
+        debug('Create import notes (start)', notesToCreate);
 
         notesToCreate.forEach((note) => {
             if (!note.file || !note.id) {
@@ -228,11 +248,16 @@ export default class Importer extends NoteScanner {
             }
 
             // Insert the note into its file
-            note.file?.insert(note.text('import'), pos);
+            note.lastImport = moment();
+
+            const text = `${note.text('import').trimEnd()}\n\n`;
+            note.file?.insert(text, pos);
+
             this.plugin.notes.add(note.id);
         });
 
         await this.plugin.save();
+        debug('Create import notes (end)');
     }
 
     private async updateNotes(ankiNotes: Note[]) {
@@ -243,10 +268,8 @@ export default class Importer extends NoteScanner {
         if (notesToUpdate.length === 0) {
             return;
         }
-        console.log(
-            'Update notes',
-            notesToUpdate.map((note) => note.clone())
-        );
+
+        debug('Update import notes (start)', notesToUpdate);
 
         for (const ankiNote of notesToUpdate) {
             // Determine which Obsidian note corresponds to an (updated) Anki note
@@ -255,14 +278,21 @@ export default class Importer extends NoteScanner {
             }
 
             const note = this.notesWithId.get(ankiNote.id);
-            if (!note) {
+            if (!note || !note.id) {
+                return;
+            }
+
+            const rule = this.noteRules.get(note.id);
+            if (!rule) {
+                debug(`No rule found for note ${note.id}`);
                 return;
             }
 
             // Replace the contents of the note
             const noteBefore = note.text('import');
 
-            note.note = ankiNote.note;
+            note.fields = { ...ankiNote.fields };
+            note.setFromTemplate(rule.template);
             note.lastImport = moment();
 
             const noteAfter = note.text('import');
@@ -273,6 +303,7 @@ export default class Importer extends NoteScanner {
         }
 
         await this.plugin.save();
+        debug('Update import notes (end)');
     }
 
     private async findFile(path: string, rule: ImportRule): Promise<File> {

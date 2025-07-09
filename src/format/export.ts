@@ -26,6 +26,8 @@ import {
     OBSIDIAN_MATH_BLOCK_REGEX,
 } from 'regex';
 import { AnkiMedia } from 'anki/connect';
+import { getMediaPath } from 'utils';
+import { App } from 'obsidian';
 
 export default class ExportFormatter extends Formatter {
     converter: Converter;
@@ -33,8 +35,8 @@ export default class ExportFormatter extends Formatter {
     mediaLinks: Set<string> = new Set();
     media: AnkiMedia[] = [];
 
-    constructor(vault: string) {
-        super(vault);
+    constructor(app: App) {
+        super(app);
 
         this.converter = new Converter({
             simplifiedAutoLink: true,
@@ -47,7 +49,7 @@ export default class ExportFormatter extends Formatter {
         });
     }
 
-    override formatStr(markdown: string): string {
+    override formatStr(markdown: string): Promise<string> {
         this.result = String(markdown);
 
         // Replace Markdown elements such as links and media
@@ -79,11 +81,11 @@ export default class ExportFormatter extends Formatter {
         this.decensor(MATH_BLOCK_REPLACE, mathBlocks, true);
         this.decensor(MATH_INLINE_REPLACE, mathInlines, true);
 
-        return this.convertToHTML();
+        return Promise.resolve(this.convertToHTML());
     }
 
     formatMedia(): void {
-        if (!this.note) {
+        if (!this.note || !this.note.file) {
             return;
         }
 
@@ -101,7 +103,7 @@ export default class ExportFormatter extends Formatter {
             const name = basename(link);
 
             const before = new RegExp(escapeRegex(original), 'g');
-            let after = undefined;
+            let after;
 
             // Audio
             if (AUDIO_EXTENSIONS.includes(ext)) {
@@ -129,7 +131,7 @@ export default class ExportFormatter extends Formatter {
                 );
             }
 
-            if (!after) {
+            if (after === undefined) {
                 continue;
             }
 
@@ -143,7 +145,11 @@ export default class ExportFormatter extends Formatter {
             this.mediaLinks.add(link);
 
             // Retrieve the absolute path to the media file
-            const path = this.note.getMediaPath(link);
+            const path = getMediaPath(
+                this.note.plugin.app,
+                this.note.file.tfile.path,
+                link
+            );
             if (!path) {
                 continue;
             }
@@ -167,10 +173,11 @@ export default class ExportFormatter extends Formatter {
         }
 
         console.info('Links', links);
+        const vault = this.app.vault.getName();
 
         for (const link of links) {
             const before = new RegExp(escapeRegex(link.original), 'g');
-            const after = `<a href="${formatURI(this.vault, link.link)}">${link.displayText}</a>`;
+            const after = `<a href="${formatURI(vault, link.link)}">${link.displayText}</a>`;
 
             this.result = this.result.replace(before, after);
         }

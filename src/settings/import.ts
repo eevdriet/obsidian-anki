@@ -1,14 +1,9 @@
-import { DEFAULT_TEMPLATE } from 'settings';
+import { DEFAULT_TEMPLATE, Rule } from 'settings';
 
 export type ImportType = 'folder' | 'file';
 export type ExistingAction = 'ignore' | 'update' | 'append';
 
-export type ImportRule = {
-    // Whether the rule currently is enabled
-    enabled: boolean;
-
-    noteType: string;
-
+export type ImportRule = Rule & {
     // Query to subset all notes for the given note type
     query: string;
 

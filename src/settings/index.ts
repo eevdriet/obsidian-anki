@@ -1,6 +1,11 @@
 import { ExportRule } from './export';
 import { ImportRule } from './import';
 
+export type Rule = {
+    enabled: boolean;
+    noteType: string;
+};
+
 export interface AnkiPluginSettings {
     // Sync
     onload: {

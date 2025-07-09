@@ -19,6 +19,7 @@ import { Moment } from 'moment';
 import { File, NoteMatch } from './file';
 import { debug } from 'common';
 import { FileSystemAdapter, moment } from 'obsidian';
+import { Rule } from 'settings';
 
 export enum NoteStatus {
     // Export states
@@ -83,10 +84,15 @@ export class Note {
         return note;
     }
 
-    private static fromMatch(plugin: AnkiPlugin, match: NoteMatch): Note {
+    private static fromMatch(
+        plugin: AnkiPlugin,
+        match: NoteMatch,
+        rule: Rule
+    ): Note {
         const note = new Note(plugin, match.file);
 
         note.id = match.id ? parseInt(match.id) : undefined;
+        note.noteType = rule.noteType;
 
         // Set properties
         note.note = match.text;
@@ -105,9 +111,8 @@ export class Note {
         match: NoteMatch,
         rule: ImportRule
     ): Note {
-        const note = Note.fromMatch(plugin, match);
+        const note = Note.fromMatch(plugin, match, rule);
 
-        note.noteType = rule.noteType;
         note.lastImport = match.datetime ? moment(match.datetime) : undefined;
 
         return note;
@@ -118,9 +123,8 @@ export class Note {
         match: NoteMatch,
         rule: ExportRule
     ) {
-        const note = Note.fromMatch(plugin, match);
+        const note = Note.fromMatch(plugin, match, rule);
 
-        note.noteType = rule.noteType;
         note.lastExport = match.datetime ? moment(match.datetime) : undefined;
 
         // Tags (both from rule and from file)
@@ -133,27 +137,6 @@ export class Note {
             : NoteStatus.EXPORT_CREATE;
 
         return note;
-    }
-
-    getMediaPath(link: string): string | undefined {
-        if (!this.file) {
-            return undefined;
-        }
-
-        // Get the relative path within the vault
-        const relPath = this.plugin.app.metadataCache.getFirstLinkpathDest(
-            link,
-            this.file.tfile.path
-        )?.path;
-
-        if (!relPath) {
-            return undefined;
-        }
-
-        // Get the absolute path w.r.t. the vault location on the file system
-        return (this.plugin.app.vault.adapter as FileSystemAdapter).getFullPath(
-            relPath
-        );
     }
 
     setLink(path: string, field: string, line?: number) {

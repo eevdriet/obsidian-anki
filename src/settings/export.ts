@@ -1,15 +1,13 @@
-import { DEFAULT_TEMPLATE } from 'settings';
+import { DEFAULT_TEMPLATE, Rule } from 'settings';
 
 export type ExportType = 'template' | 'regex';
 
-export type ExportRule = {
+export type ExportRule = Rule & {
     /** What format to use when exporting notes
      * - Template: matches text literally and uses {{Field}} replacements
      * - Regex: matches text through regular expressions and fills fields through capture groups
      */
     type: ExportType;
-
-    enabled: boolean;
 
     template: {
         format: string;
@@ -38,9 +36,6 @@ export type ExportRule = {
         // Patterns to include/exclude when searching
         patterns: string[];
     };
-
-    // Which note type to create
-    noteType: string;
 
     // Whether to override fields that are not captured by the regex
     shouldOverride: boolean;

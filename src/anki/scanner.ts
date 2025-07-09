@@ -8,7 +8,6 @@ import { debug } from 'common';
 export default class NoteScanner {
     plugin: AnkiPlugin;
     app: App;
-    vault: string;
 
     files: Map<string, File> = new Map();
     notesWithId: Map<number, Note> = new Map();
@@ -18,7 +17,6 @@ export default class NoteScanner {
     constructor(plugin: AnkiPlugin) {
         this.plugin = plugin;
         this.app = plugin.app;
-        this.vault = this.app.vault.getName();
     }
 
     protected async scanVault() {

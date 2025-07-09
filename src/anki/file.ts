@@ -130,9 +130,6 @@ export class File {
      * @param newText - Replacement
      */
     public replace(oldText: string | RegExp, newText: string) {
-        console.info('Note before', oldText);
-        console.info('Note after', newText);
-
         // Verify whether the old text is present in the file
         let shouldReplace: boolean = true;
 
@@ -172,7 +169,6 @@ export class File {
         ];
 
         const regex = new RegExp(parts.join('\n'), 'gmi');
-        console.info('Regex (import)', regex.source);
 
         return this.matchAll(regex).map((match) => {
             const { text, props } = match.groups!;

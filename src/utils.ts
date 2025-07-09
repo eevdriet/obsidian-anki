@@ -1,3 +1,5 @@
+import { App, FileSystemAdapter } from 'obsidian';
+
 export function objToMap<T>(obj: Record<string, T>): Map<string, T> {
     return new Map(Object.entries(obj));
 }
@@ -43,4 +45,24 @@ export function areEqual(
     }
 
     return true;
+}
+
+export function getMediaPath(
+    app: App,
+    file: string,
+    link: string
+): string | undefined {
+    // Get the relative path within the vault
+    const relPath = app.metadataCache.getFirstLinkpathDest(link, file)?.path;
+
+    if (!relPath) {
+        return undefined;
+    }
+
+    return getAbsolutePath(app, relPath);
+}
+
+export function getAbsolutePath(app: App, relPath: string) {
+    // Get the absolute path w.r.t. the vault location on the file system
+    return (app.vault.adapter as FileSystemAdapter).getFullPath(relPath);
 }

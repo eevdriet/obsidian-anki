@@ -8,6 +8,12 @@ export type AnkiRequest = {
     params: Record<string, any>;
 };
 
+export type ObsidianMedia = {
+    filename: string;
+
+    path?: string;
+};
+
 export type AnkiMedia = {
     filename: string;
 
@@ -157,9 +163,17 @@ export async function createDecks(...decks: string[]): Promise<number[]> {
     return multi(requests);
 }
 
-export async function storeMedia(...media: AnkiMedia[]): Promise<null[]> {
+export async function storeMedia(...media: AnkiMedia[]): Promise<string[]> {
     const requests = media.map((medium) =>
         createRequest('storeMediaFile', medium)
+    );
+
+    return multi(requests);
+}
+
+export async function retrieveMedia(...files: string[]): Promise<string[]> {
+    const requests = files.map((filename) =>
+        createRequest('retrieveMediaFile', { filename })
     );
 
     return multi(requests);

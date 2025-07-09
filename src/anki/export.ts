@@ -13,7 +13,7 @@ export default class Exporter extends NoteScanner {
     constructor(plugin: AnkiPlugin) {
         super(plugin);
 
-        this.formatter = new ExportFormatter(this.vault);
+        this.formatter = new ExportFormatter(this.app);
     }
 
     public async export(): Promise<void> {
@@ -29,9 +29,12 @@ export default class Exporter extends NoteScanner {
         }
 
         // Format the notes to a suitable format for Anki and retrieve media
-        const formattedNotes = allNotes.map((note) =>
-            this.formatter.format(note)
-        );
+        const formattedNotes = [];
+        for (const note of allNotes) {
+            const formatted = await this.formatter.format(note);
+            formattedNotes.push(formatted);
+        }
+
         const media = this.formatter.media;
 
         try {
@@ -121,13 +124,10 @@ export default class Exporter extends NoteScanner {
             return;
         }
 
-        // Format the notes to a suitable format for Anki
-        const ankiNotes = notesToCreate
-            .map((note) => this.formatter.format(note))
-            .map((note) => note.create());
-
         // Determine which notes could be succesfully created
-        const identifiers = await AnkiConnect.createNotes(...ankiNotes);
+        const identifiers = await AnkiConnect.createNotes(
+            ...notesToCreate.map((note) => note.create())
+        );
 
         notesToCreate.forEach((note, idx) => {
             const id = identifiers[idx];
@@ -179,11 +179,10 @@ export default class Exporter extends NoteScanner {
         this.plugin.save();
 
         // Update the notes in Anki
-        const ankiNotes = notesToUpdate
-            .map((note) => this.formatter.format(note))
-            .map((note) => note.update());
 
-        await AnkiConnect.updateNotes(...ankiNotes);
+        await AnkiConnect.updateNotes(
+            ...notesToUpdate.map((note) => note.update())
+        );
         debug('Update export notes (end)');
     }
 

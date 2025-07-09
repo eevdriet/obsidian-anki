@@ -20,7 +20,6 @@ import { addSection } from 'modals';
 import { FolderSuggest, TextSuggest } from './suggest';
 import { countCaptureGroups } from 'regex';
 import { message, PLUGIN } from 'common';
-import { areEqual } from 'utils';
 
 export default class ExportModal extends AnkiModal {
     name: string;

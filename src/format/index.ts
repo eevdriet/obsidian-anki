@@ -1,6 +1,7 @@
 import { AnkiMedia as AnkiMedia } from 'anki/connect';
 import { Note } from 'anki/note';
 import { TEMPLATE_FIELDS } from 'common';
+import { App } from 'obsidian';
 import { ANKI_CLOZE_REGEX, ANKI_PATTERN_REGEX } from 'regex';
 
 export const MATH_INLINE_REPLACE = 'MATH-INLINE-REPLACE';
@@ -28,18 +29,18 @@ export const DEFAULT_FILE_NAME_ESCAPE_OPTIONS: FileEscapeOptions = {
 };
 
 export default abstract class Formatter {
-    vault: string;
+    app: App;
 
     note?: Note;
     result: string = '';
 
-    constructor(vault: string) {
-        this.vault = vault;
+    constructor(app: App) {
+        this.app = app;
     }
 
-    public abstract formatStr(txt: string): string;
+    public abstract formatStr(txt: string): Promise<string>;
 
-    public format(note: Note): Note {
+    public async format(note: Note): Promise<Note> {
         // Format a copy of the note to preserve the original
         this.note = note.clone();
 
@@ -48,7 +49,7 @@ export default abstract class Formatter {
             .map(([field, val]) => `${field}${KEY_VALUE_SEPARATOR}${val}`)
             .join(FIELD_SEPARATOR);
 
-        fieldsStr = this.formatStr(fieldsStr);
+        fieldsStr = await this.formatStr(fieldsStr);
 
         // Reconstruct the fields
         for (const fieldStr of fieldsStr.split(FIELD_SEPARATOR)) {
@@ -59,7 +60,7 @@ export default abstract class Formatter {
             }
         }
 
-        return this.note;
+        return Promise.resolve(this.note);
     }
 
     protected censor(before: RegExp, after: string): string[] {
