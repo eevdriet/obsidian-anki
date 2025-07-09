@@ -10,23 +10,24 @@ export const REPO_URL = 'https://github.com/eevdriet/obsidian-anki';
 export const WIKI_URL = `${REPO_URL}/wiki`;
 
 export const IMAGE_EXTENSIONS: string[] = [
-    '.png',
-    '.jpg',
-    '.jpeg',
-    '.gif',
     '.bmp',
+    '.gif',
+    '.jpeg',
+    '.jpg',
+    '.png',
     '.svg',
     '.tiff',
 ];
 export const AUDIO_EXTENSIONS: string[] = [
-    '.wav',
-    '.m4a',
-    '.flac',
-    '.mp3',
-    '.wma',
     '.aac',
+    '.flac',
+    '.m4a',
+    '.mp3',
+    '.wav',
     '.webm',
+    '.wma',
 ];
+export const VIDEO_EXTENSIONS: string[] = ['.mp4'];
 
 export const TEMPLATE_FIELDS: string[] = ['Fields', 'Tags', 'Deck'];
 

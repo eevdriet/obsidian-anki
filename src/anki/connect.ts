@@ -8,6 +8,13 @@ export type AnkiRequest = {
     params: Record<string, any>;
 };
 
+export type AnkiMedia = {
+    filename: string;
+    data?: string;
+    path?: string;
+    url?: string;
+};
+
 export interface AnkiResponse<T> {
     error: string | null;
     result: T;
@@ -143,6 +150,14 @@ export async function getCardsInfo(...cards: number[]): Promise<CardInfo[]> {
  */
 export async function createDecks(...decks: string[]): Promise<number[]> {
     const requests = decks.map((deck) => createRequest('createDeck', { deck }));
+
+    return multi(requests);
+}
+
+export async function storeMedia(...media: AnkiMedia[]): Promise<null[]> {
+    const requests = media.map((medium) =>
+        createRequest('storeMediaFile', medium)
+    );
 
     return multi(requests);
 }

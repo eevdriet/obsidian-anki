@@ -17,6 +17,7 @@ import { formatURI } from 'format';
 import { Moment } from 'moment';
 import { File } from './file';
 import { debug } from 'common';
+import { FileSystemAdapter } from 'obsidian';
 
 export enum NoteStatus {
     // Export states
@@ -79,6 +80,27 @@ export class Note {
         );
 
         return note;
+    }
+
+    getMediaPath(link: string): string | undefined {
+        if (!this.file) {
+            return undefined;
+        }
+
+        // Get the relative path within the vault
+        const relPath = this.plugin.app.metadataCache.getFirstLinkpathDest(
+            link,
+            this.file.tfile.path
+        )?.path;
+
+        if (!relPath) {
+            return undefined;
+        }
+
+        // Get the absolute path w.r.t. the vault location on the file system
+        return (this.plugin.app.vault.adapter as FileSystemAdapter).getFullPath(
+            relPath
+        );
     }
 
     setLink(path: string, field: string, line?: number) {

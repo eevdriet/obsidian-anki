@@ -1,6 +1,18 @@
+import { AnkiMedia as AnkiMedia } from 'anki/connect';
 import { Note } from 'anki/note';
 import { TEMPLATE_FIELDS } from 'common';
 import { ANKI_CLOZE_REGEX, ANKI_PATTERN_REGEX } from 'regex';
+
+export const MATH_INLINE_REPLACE = 'MATH-INLINE-REPLACE';
+export const MATH_BLOCK_REPLACE = 'MATH-BLOCK-REPLACE';
+export const CODE_INLINE_REPLACE = 'CODE-INLINE-REPLACE';
+export const CODE_BLOCK_REPLACE = 'CODE-BLOCK-REPLACE';
+
+export const KEY_VALUE_SEPARATOR = '75OG2p3sNlMYk5qV9p6GlD7RmUauuc';
+export const FIELD_SEPARATOR = '1zOOzXmPuC211nTbzj11JQ33M4fj6e';
+
+export const PARAGRAPH_OPEN = '<p>';
+export const PARAGRAPH_CLOSE = '</p>';
 
 export interface FileEscapeOptions {
     // Replaces {{cn::<cloze>}} with just <cloze>
@@ -28,15 +40,26 @@ export default abstract class Formatter {
     public abstract formatStr(txt: string): string;
 
     public format(note: Note): Note {
-        const result: Note = note.clone();
+        // Format a copy of the note to preserve the original
+        this.note = note.clone();
 
-        this.note = result;
+        // Format all fields at once
+        let fieldsStr = Object.entries(this.note.fields)
+            .map(([field, val]) => `${field}${KEY_VALUE_SEPARATOR}${val}`)
+            .join(FIELD_SEPARATOR);
 
-        for (const [field, value] of Object.entries(result.fields)) {
-            result.fields[field] = this.formatStr(value.trim());
+        fieldsStr = this.formatStr(fieldsStr);
+
+        // Reconstruct the fields
+        for (const fieldStr of fieldsStr.split(FIELD_SEPARATOR)) {
+            const [field, val] = fieldStr.split(KEY_VALUE_SEPARATOR);
+
+            if (field !== undefined && val != undefined) {
+                this.note.fields[field] = val.trim();
+            }
         }
 
-        return result;
+        return this.note;
     }
 
     protected censor(before: RegExp, after: string): string[] {

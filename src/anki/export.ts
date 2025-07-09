@@ -28,14 +28,17 @@ export default class Exporter extends NoteScanner {
             return;
         }
 
-        // Format the notes to a suitable format for Anki
+        // Format the notes to a suitable format for Anki and retrieve media
         const formattedNotes = allNotes.map((note) =>
             this.formatter.format(note)
         );
+        const media = this.formatter.media;
 
         try {
             // Perform Anki actions on the export notes
             await this.createDecks();
+            await this.storeMedia(media);
+
             await this.createNotes(formattedNotes);
             await this.updateNotes(formattedNotes);
             await this.deleteNotes(formattedNotes);
@@ -99,6 +102,12 @@ export default class Exporter extends NoteScanner {
         }
 
         await AnkiConnect.createDecks(...decks);
+    }
+
+    private async storeMedia(media: AnkiConnect.AnkiMedia[]) {
+        console.info('Media files (request)', media);
+        const files = await AnkiConnect.storeMedia(...media);
+        console.info('Media files (response)', files);
     }
 
     private async createNotes(notes: Note[]) {
