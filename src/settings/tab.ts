@@ -53,12 +53,23 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
     }
 
     addSyncSettings(containerEl: HTMLElement): void {
-        addSection(
+        const section = addSection(
             containerEl,
             'Sync on startup',
             'Whether to sync with and import/export notes between Anki and Obsidian',
             'refresh-cw'
-        ).addExtraButton((button) => setupWikiButton(button, 'Syncing'));
+        );
+
+        section
+            .addExtraButton((button) => setupWikiButton(button, 'Syncing'))
+            .addExtraButton((button) => {
+                button
+                    .setIcon('refresh-cw')
+                    .setTooltip('Sync now')
+                    .onClick(async () => {
+                        sync(this.plugin);
+                    });
+            });
 
         const syncSettings = this.plugin.settings.onload;
 
@@ -70,51 +81,23 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
                     syncSettings.sync = value;
                     this.plugin.save();
                 });
-            })
-            .addExtraButton((button) => {
-                button
-                    .setIcon('refresh-cw')
-                    .setTooltip('Sync now')
-                    .onClick(async () => {
-                        sync(this.plugin);
-                    });
             });
 
         // Import on startrup
-        new Setting(containerEl)
-            .setName('Import?')
-            .addToggle((toggle) => {
-                toggle.setValue(syncSettings.import).onChange((value) => {
-                    syncSettings.import = value;
-                    this.plugin.save();
-                });
-            })
-            .addExtraButton((button) => {
-                button
-                    .setIcon('arrow-down-to-line')
-                    .setTooltip('Import now')
-                    .onClick(async () => {
-                        this.plugin.importer.import();
-                    });
+        new Setting(containerEl).setName('Import?').addToggle((toggle) => {
+            toggle.setValue(syncSettings.import).onChange((value) => {
+                syncSettings.import = value;
+                this.plugin.save();
             });
+        });
 
         // Export on startrup
-        new Setting(containerEl)
-            .setName('Export?')
-            .addToggle((toggle) => {
-                toggle.setValue(syncSettings.export).onChange((value) => {
-                    syncSettings.export = value;
-                    this.plugin.save();
-                });
-            })
-            .addExtraButton((button) => {
-                button
-                    .setIcon('arrow-up-from-line')
-                    .setTooltip('Export now')
-                    .onClick(async () => {
-                        this.plugin.exporter.export();
-                    });
+        new Setting(containerEl).setName('Export?').addToggle((toggle) => {
+            toggle.setValue(syncSettings.export).onChange((value) => {
+                syncSettings.export = value;
+                this.plugin.save();
             });
+        });
     }
 
     addImportSettings(containerEl: HTMLElement): void {
@@ -131,30 +114,35 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         const importRules = this.plugin.settings.import.rules;
 
         // New rule button
-        importHeading.addButton((button) => {
-            button
-                .setButtonText('New rule')
-                .setCta()
-                .onClick(() => {
-                    const formModal = new ImportModal(
-                        'New rule',
-                        this.plugin,
-                        () => {
-                            this.drawRules(
-                                importersDiv,
-                                importRules,
-                                ImportModal
-                            );
-                        }
-                    );
-                    formModal.open();
-                });
-        });
-
-        // Documentation button
-        importHeading.addExtraButton((button) =>
-            setupWikiButton(button, 'Importing')
-        );
+        importHeading
+            .addExtraButton((button) => setupWikiButton(button, 'Importing'))
+            .addExtraButton((button) => {
+                button
+                    .setIcon('arrow-down-to-line')
+                    .setTooltip('Import now')
+                    .onClick(async () => {
+                        this.plugin.importer.import();
+                    });
+            })
+            .addButton((button) => {
+                button
+                    .setButtonText('New rule')
+                    .setCta()
+                    .onClick(() => {
+                        const formModal = new ImportModal(
+                            'New rule',
+                            this.plugin,
+                            () => {
+                                this.drawRules(
+                                    importersDiv,
+                                    importRules,
+                                    ImportModal
+                                );
+                            }
+                        );
+                        formModal.open();
+                    });
+            });
 
         this.drawRules(importersDiv, importRules, ImportModal);
     }
@@ -174,30 +162,35 @@ export default class AnkiPluginSettingTab extends PluginSettingTab {
         const exportRules = this.plugin.settings.export.rules;
 
         // Add new rule button
-        exportHeading.addButton((button) => {
-            button
-                .setButtonText('New rule')
-                .setCta()
-                .onClick(() => {
-                    const formModal = new ExportModal(
-                        'New rule',
-                        this.plugin,
-                        () => {
-                            this.drawRules(
-                                exportersDiv,
-                                exportRules,
-                                ExportModal
-                            );
-                        }
-                    );
-                    formModal.open();
-                });
-        });
-
-        // Documentation button
-        exportHeading.addExtraButton((button) =>
-            setupWikiButton(button, 'Exporting')
-        );
+        exportHeading
+            .addExtraButton((button) => setupWikiButton(button, 'Exporting'))
+            .addExtraButton((button) => {
+                button
+                    .setIcon('arrow-up-from-line')
+                    .setTooltip('Export now')
+                    .onClick(async () => {
+                        this.plugin.exporter.export();
+                    });
+            })
+            .addButton((button) => {
+                button
+                    .setButtonText('New rule')
+                    .setCta()
+                    .onClick(() => {
+                        const formModal = new ExportModal(
+                            'New rule',
+                            this.plugin,
+                            () => {
+                                this.drawRules(
+                                    exportersDiv,
+                                    exportRules,
+                                    ExportModal
+                                );
+                            }
+                        );
+                        formModal.open();
+                    });
+            });
 
         this.drawRules(exportersDiv, exportRules, ExportModal);
 
