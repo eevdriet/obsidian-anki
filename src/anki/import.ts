@@ -95,6 +95,8 @@ export default class Importer extends NoteScanner {
                 ruleFile = await this.findFile(rule.file.path, rule);
                 const notes = ruleFile.findImportNotes(rule);
 
+                console.info('File', ruleFile.tfile.name, notes);
+
                 for (const note of notes) {
                     if (note.id) {
                         this.notesWithId.set(note.id, note);

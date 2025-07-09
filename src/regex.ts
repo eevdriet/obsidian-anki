@@ -100,7 +100,10 @@ export const NOTE_ID_COMMENT_REGEX = createCommentRegex(
     `Note id(?:entifier)?:\\s*${ID_REGEX.source}`,
     false
 );
-export const NOTE_TEXT_REGEX = /(?<text>(?:.|\n)+?)/gm;
+export const NOTE_TEXT_REGEX =
+    /(?<text>^(?:(?!<!-- Note)[^\n]*\S[^\n]*\n?)+)/gm;
+export const NOTE_PROPERTIES_REGEX =
+    /(?<props>(?:^[ \t]*<!-- Note(?! end).*-->[ \t]*\n?)*)/gm;
 
 export const NOTE_DATE_COMMENT_REGEX = createCommentRegex(
     `Note (?<type>import|export) date time:\\s*${DATE_TIME_REGEX.source}`,

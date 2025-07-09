@@ -5,6 +5,7 @@ import {
     createTimeStampComment,
     DECK_PATTERN,
     FIELDS_PATTERN,
+    LIST_SEP_REGEX,
     NOTE_DATE_COMMENT_REGEX,
     NOTE_END_COMMENT,
     NOTE_ID_COMMENT_REGEX,
@@ -15,9 +16,9 @@ import { ExportRule } from 'settings/export';
 import { ImportRule } from 'settings/import';
 import { formatURI } from 'format';
 import { Moment } from 'moment';
-import { File } from './file';
+import { File, NoteMatch } from './file';
 import { debug } from 'common';
-import { FileSystemAdapter } from 'obsidian';
+import { FileSystemAdapter, moment } from 'obsidian';
 
 export enum NoteStatus {
     // Export states
@@ -78,6 +79,58 @@ export class Note {
         note.fields = Object.fromEntries(
             fieldEntries.map(([field, value]) => [field, value.value])
         );
+
+        return note;
+    }
+
+    private static fromMatch(plugin: AnkiPlugin, match: NoteMatch): Note {
+        const note = new Note(plugin, match.file);
+
+        note.id = match.id ? parseInt(match.id) : undefined;
+
+        // Set properties
+        note.note = match.text;
+        note.fields = match.fields ?? {};
+        note.deck = match.deck;
+
+        note.tags = (match.tags ?? '')
+            .split(LIST_SEP_REGEX)
+            .map((tag) => tag.trim());
+
+        return note;
+    }
+
+    static fromImportMatch(
+        plugin: AnkiPlugin,
+        match: NoteMatch,
+        rule: ImportRule
+    ): Note {
+        const note = Note.fromMatch(plugin, match);
+
+        note.noteType = rule.noteType;
+        note.lastImport = match.datetime ? moment(match.datetime) : undefined;
+
+        return note;
+    }
+
+    static fromExportMatch(
+        plugin: AnkiPlugin,
+        match: NoteMatch,
+        rule: ExportRule
+    ) {
+        const note = Note.fromMatch(plugin, match);
+
+        note.noteType = rule.noteType;
+        note.lastExport = match.datetime ? moment(match.datetime) : undefined;
+
+        // Tags (both from rule and from file)
+        if (rule.tag.enabled && !note.tags.includes(rule.tag.format)) {
+            note.tags = [...note.tags, rule.tag.format];
+        }
+
+        note.status = note.id
+            ? NoteStatus.EXPORT_UPDATE
+            : NoteStatus.EXPORT_CREATE;
 
         return note;
     }

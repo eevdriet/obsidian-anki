@@ -10,9 +10,12 @@ export type AnkiRequest = {
 
 export type AnkiMedia = {
     filename: string;
+
     data?: string;
     path?: string;
     url?: string;
+
+    deleteExisting?: boolean;
 };
 
 export interface AnkiResponse<T> {

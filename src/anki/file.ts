@@ -18,12 +18,13 @@ import {
     NOTE_END_COMMENT,
     NOTE_DATE_COMMENT_REGEX,
     NOTE_TEXT_REGEX,
+    NOTE_PROPERTIES_REGEX,
 } from 'regex';
 import * as CryptoJS from 'crypto-js';
 import { Span, MultiSpan } from './span';
 import { ExportRule } from 'settings/export';
 import { moment } from 'obsidian';
-import { debug, TEMPLATE_FIELDS as TEMPLATE_PATTERNS } from 'common';
+import { TEMPLATE_FIELDS as TEMPLATE_PATTERNS } from 'common';
 import { escapeField } from 'format';
 import { ImportRule } from 'settings/import';
 
@@ -41,7 +42,7 @@ export enum FileStatus {
     MODIFIED,
 }
 
-const EXPORT_PROPERTY_PATTERNS: [keyof MatchResult, RegExp][] = [
+const EXPORT_PROPERTY_PATTERNS: [keyof NoteProperties, RegExp][] = [
     ['id', NOTE_ID_COMMENT_REGEX],
     ['datetime', NOTE_DATE_COMMENT_REGEX],
     ['deck', NOTE_DECK_COMMENT_REGEX],
@@ -49,17 +50,20 @@ const EXPORT_PROPERTY_PATTERNS: [keyof MatchResult, RegExp][] = [
     ['cards', NOTE_CARDS_COMMENT_REGEX],
 ];
 
-export type MatchResult = {
-    result: RegExpMatchArray;
-    note: string;
+export interface NoteProperties {
     fields: Record<string, string>;
+    id: string;
+    datetime: string;
+    deck: string;
+    cards: string;
+    tags: string;
+}
 
-    id?: string;
-    datetime?: string;
-    deck?: string;
-    cards?: string;
-    tags?: string;
-};
+export type NoteMatch = {
+    match: RegExpMatchArray;
+    file: File;
+    text: string;
+} & Partial<NoteProperties>;
 
 export class File {
     plugin: AnkiPlugin;
@@ -160,102 +164,64 @@ export class File {
     }
 
     public findImportNotes(rule: ImportRule): Note[] {
-        const regex = new RegExp(
-            `^${NOTE_START_COMMENT}\\n${NOTE_TEXT_REGEX.source}${NOTE_ID_COMMENT_REGEX.source}\\n?${NOTE_DATE_COMMENT_REGEX.source}\\n?${NOTE_END_COMMENT}`,
-            'gmi'
-        );
+        const parts = [
+            NOTE_START_COMMENT,
+            NOTE_TEXT_REGEX.source,
+            NOTE_PROPERTIES_REGEX.source,
+            NOTE_END_COMMENT,
+        ];
+
+        const regex = new RegExp(parts.join('\n'), 'gmi');
+        console.info('Regex (import)', regex.source);
 
         return this.matchAll(regex).map((match) => {
-            const { id, text, datetime } = match.groups!;
+            const { text, props } = match.groups!;
+            const result: NoteMatch = {
+                match,
+                text,
+                file: this,
+                ...this.extractProps(props),
+            };
 
-            const note = new Note(this.plugin, this, Number(id));
-            note.note = text;
-            note.lastImport = moment(datetime, 'YYYY-MM-DD HH:mm:ss');
+            return Note.fromImportMatch(this.plugin, result, rule);
+        });
+    }
 
-            console.info(id, 'Groups', match.groups, note.clone());
+    public findExportNotes(rule: ExportRule): Note[] {
+        // Find all notes that match the rule
+        const matches =
+            rule.type === 'regex'
+                ? this.matchRegex(rule)
+                : this.matchTemplate(rule);
+
+        return matches.map((match) => {
+            // Update part of the file that has been searched
+            const span = Span.fromMatch(match.match);
+            this.searched.merge(span);
+
+            // Determine where in the file the match occurs
+            const pos = match.match.index!;
+            const line = this.text.slice(0, pos).split('\n').length;
+            const note = Note.fromExportMatch(this.plugin, match, rule);
+
+            // Link to obsidian
+            if (rule.link.enabled && rule.link.field) {
+                note.setLink(note.file!.tfile.path, rule.link.field, line);
+            }
+
+            // Properties that can be set in multiple places
+            note.tags = (match.tags ?? this.findMatch(pos, this.tags) ?? '')
+                .split(LIST_SEP_REGEX)
+                .map((tag) => tag.trim());
+
+            note.deck =
+                match.deck ?? this.findMatch(pos, this.decks) ?? rule.deck;
 
             return note;
         });
     }
 
-    public findExportNotes(rule: ExportRule): Note[] {
-        const notes: Note[] = [];
-
-        // Find all notes that match the rule
-        let matches: MatchResult[] = [];
-
-        if (rule.type === 'regex') {
-            matches = this.matchRegex(rule);
-        } else if (rule.type === 'template') {
-            matches = this.matchTemplate(rule);
-        }
-
-        if (matches.length === 0) {
-            return [];
-        }
-
-        for (let match of matches) {
-            // Update part of the file that has been searched
-            const span = Span.fromMatch(match.result);
-            this.searched.merge(span);
-
-            // Determine where in the file the match occurs
-            const pos = match.result.index!;
-            const line = this.text.slice(0, pos).split('\n').length;
-
-            // Retrieve the note from cache or create a new one
-            const id = match.id ? parseInt(match.id) : undefined;
-
-            let note = new Note(this.plugin, this, id);
-            if (id && id in this.notes) {
-                note = this.notes[id];
-            }
-
-            // Set properties
-            note.note = match.note;
-            note.fields = match.fields;
-            note.noteType = rule.noteType;
-
-            note.deck =
-                match.deck ?? this.findMatch(pos, this.decks) ?? rule.deck;
-
-            note.lastExport = match.datetime
-                ? moment(match.datetime)
-                : undefined;
-
-            // Tags (both from rule and from file)
-            note.tags = (match.tags ?? this.findMatch(pos, this.tags) ?? '')
-                .split(LIST_SEP_REGEX)
-                .map((tag) => tag.trim());
-
-            if (rule.tag.enabled && !note.tags.includes(rule.tag.format)) {
-                note.tags = [...note.tags, rule.tag.format];
-            }
-
-            // Link to obsidian
-            if (rule.link.enabled && rule.link.field) {
-                note.setLink(this.tfile.path, rule.link.field, line);
-            }
-
-            note.status = note.id
-                ? NoteStatus.EXPORT_UPDATE
-                : NoteStatus.EXPORT_CREATE;
-
-            // Add note
-            notes.push(note);
-        }
-
-        // Register notes
-        for (const note of notes) {
-            if (note.id) {
-                this.notes[note.id] = note;
-            }
-        }
-
-        return notes;
-    }
-
-    private matchTemplate(rule: ExportRule): MatchResult[] {
+    private matchTemplate(rule: ExportRule): NoteMatch[] {
         let template = String(rule.template.format);
         const allFields = this.plugin.fields[rule.noteType] ?? [];
 
@@ -295,14 +261,14 @@ export class File {
         }
 
         const regex = new RegExp(
-            `(?<_note>${template})(?<props>(?:\\n?^\\s*<!--\\s.*-->\\s*$)*)`,
+            `(?<_note>${template})${NOTE_PROPERTIES_REGEX.source}`,
             'gim'
         );
         console.info('Regex (template)', regex.source);
 
         return this.matchAll(regex).map((match) => {
             const {
-                _note: note,
+                _note: text,
                 _fields,
                 props,
                 deck,
@@ -324,22 +290,22 @@ export class File {
             }
 
             // Set properties from HTML comments based on the (named) groups
-            let result: MatchResult = {
-                result: match,
+            return {
+                ...this.extractProps(props),
+                match,
                 fields,
-                note,
+                text,
                 deck,
                 tags,
+                file: this,
             };
-
-            return { ...result, ...this.extractProps(props) };
         });
     }
 
-    private matchRegex(rule: ExportRule): MatchResult[] {
+    private matchRegex(rule: ExportRule): NoteMatch[] {
         // Match against the rule's regex and optionally some properties set in HTML comment
         const regex = new RegExp(
-            `(?<note>${rule.regex.format})(?<props>(?:\\n^\\s*<!--\\s.*-->\\s*$)*)`,
+            `(?<text>${rule.regex.format})\\n${NOTE_PROPERTIES_REGEX.source}`,
             'gm'
         );
 
@@ -383,10 +349,14 @@ export class File {
                         }
                     }
 
-                    const { note, props } = match.groups!;
-                    let result: MatchResult = { result: match, fields, note };
-
-                    return { ...result, ...this.extractProps(props) };
+                    const { text, props } = match.groups!;
+                    return {
+                        ...this.extractProps(props),
+                        match,
+                        fields,
+                        text,
+                        file: this,
+                    };
                 })
         );
     }
@@ -446,7 +416,7 @@ export class File {
         return result;
     }
 
-    private extractProps(props: string): MatchResult {
+    private extractProps(props: string): NoteProperties {
         let result = {};
 
         // Set properties from HTML comments based on the (named) capture groups
@@ -457,6 +427,6 @@ export class File {
             }
         }
 
-        return result as MatchResult;
+        return result as NoteProperties;
     }
 }
