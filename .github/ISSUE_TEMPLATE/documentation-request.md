@@ -1,9 +1,9 @@
 ---
-name: Feature request
-about: Suggest a new feature for the project
-title: "[FEATURE]"
-labels: enhancement
-assignees: eevdriet
+name: Documentation request
+about: Suggest improvements for the documentation for the project
+title: ''
+labels: ''
+assignees: ''
 
 ---
 
